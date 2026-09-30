@@ -1,0 +1,27 @@
+[project]
+name = "nyaya-backend"
+version = "0.1.0"
+description = "Backend for the AI legal case research assistant"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "fastembed>=0.8.1",
+    "httpx>=0.28.1",
+    "openai>=3.21.0",
+    "pandas>=3.0.6",
+    "pgvector>=0.5.0",
+    "psycopg[binary]>=3.3.6",
+    "pyarrow>=25.0.1",
+    "pydantic-settings>=2.15.0",
+    "pymupdf>=1.28.2",
+    "sqlalchemy>=2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
