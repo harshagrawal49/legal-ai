@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 import openai
@@ -8,6 +9,8 @@ from fastapi.responses import JSONResponse
 from app.api import cases, judgments
 from app.db import init_db
 from app.llm.client import LLMRefusal
+
+log = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
@@ -31,6 +34,7 @@ def refusal_handler(request: Request, exc: LLMRefusal):
 def llm_unavailable_handler(request: Request, exc: openai.APIError):
     # The client already retried; the provider is overloaded, rate-limiting, or unreachable.
     status = getattr(exc, "status_code", None)
+    log.warning("LLM call failed on %s %s: %s %s", request.method, request.url.path, status, exc)
     if status is not None and status < 500 and status != 429:
         raise exc
     return JSONResponse(
