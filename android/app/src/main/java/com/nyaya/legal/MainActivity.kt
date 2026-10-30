@@ -53,9 +53,10 @@ fun AppNavigation() {
             IntakeScreen(
                 caseId = entry.arguments?.getString("caseId"),
                 onBack = { nav.popBackStack() },
-                // After the search, land on the case home: chat, documents, results and brief in one place.
+                // After the search, show the results; Back goes to the case home (chat, documents, brief).
                 onResults = { caseId ->
                     nav.navigate("case/$caseId") { popUpTo("cases") }
+                    nav.navigate("results/$caseId")
                 },
                 onDocuments = { caseId -> nav.navigate("documents/$caseId") },
             )

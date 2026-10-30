@@ -55,7 +55,7 @@ class ResultsViewModel(caseId: String) : ViewModel() {
         viewModelScope.launch {
             runCatching { Api.service.results(caseId) }
                 .onSuccess { results = it }
-                .onFailure { error = "Could not load results: ${it.message}" }
+                .onFailure { error = Api.errorMessage(it) }
         }
     }
 }
@@ -92,7 +92,11 @@ fun ResultsScreen(
             when {
                 vm.error != null -> ErrorText(vm.error!!)
                 results == null -> Loading("Loading…")
-                results.isEmpty() -> Text("No closely matching judgments were found in the database yet.", Modifier.padding(16.dp))
+                results.isEmpty() -> Text(
+                    "No closely matching judgments were found among the judgments loaded so far. You can still " +
+                        "chat about your case, attach documents and prepare a brief; more judgments may help later.",
+                    Modifier.padding(16.dp),
+                )
                 else -> LazyColumn(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

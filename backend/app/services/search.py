@@ -120,6 +120,9 @@ def find_similar_cases(db: Session, case: Case) -> list[CaseResult]:
     queries = [fs["summary"], *fs.get("search_queries", [])]
     candidates = hybrid_search(db, queries, settings.search_candidates)
     if not candidates:
+        # Still a completed search: the app shows "no similar judgments" instead of asking again.
+        case.results = []
+        case.status = "searched"
         return []
 
     blocks = "\n\n".join(_candidate_block(db, c) for c in candidates)

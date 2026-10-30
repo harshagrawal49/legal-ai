@@ -44,3 +44,14 @@ def test_openapi_builds():
     paths = app.openapi()["paths"]
     assert "/cases/{case_id}/chat" in paths
     assert "/judgments/{judgment_id}" in paths
+
+
+def test_search_with_no_matches_still_completes(monkeypatch):
+    """Otherwise the app keeps offering "find similar cases" and never shows a result screen."""
+    from app.models import Case
+    from app.services import search
+
+    monkeypatch.setattr(search, "hybrid_search", lambda db, queries, limit: [])
+    case = Case(user_id="u", status="intake", fact_sheet={"summary": "Advance paid; plot sold to another buyer."})
+    assert search.find_similar_cases(None, case) == []
+    assert case.status == "searched" and case.results == []

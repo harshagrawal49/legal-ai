@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import DB, User, UserCase
-from app.models import Case
+from app.models import Case, Judgment
 from app.schemas import (
     CaseOut,
     CaseResultOut,
@@ -69,6 +69,12 @@ def run_search(case: UserCase, db: DB):
     """Step 3: the user confirms the summary; find and explain similar judgments."""
     if not case.fact_sheet:
         raise HTTPException(400, "Describe the case first")
+    if not db.scalar(select(func.count()).select_from(Judgment)):
+        raise HTTPException(
+            409,
+            "No court judgments have been loaded on the server yet, so there is nothing to search. "
+            "Load some with: uv run python -m ingest.supreme_court --year 2023 --limit 30",
+        )
     results = search.find_similar_cases(db, case)
     db.commit()
     return results
