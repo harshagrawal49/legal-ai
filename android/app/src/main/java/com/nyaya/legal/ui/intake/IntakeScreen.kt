@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +45,6 @@ import com.nyaya.legal.data.CaseDetail
 import com.nyaya.legal.data.FactSheet
 import com.nyaya.legal.data.IntakeAnswerRequest
 import com.nyaya.legal.data.NewCaseRequest
-import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.Loading
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.filled.Close
@@ -121,12 +121,20 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
         Column(Modifier.fillMaxSize().padding(padding)) {
             val busy = vm.busy
             val case = vm.case
+            // At the top: the steps below scroll and fill the screen, so anything after them is hidden.
+            vm.error?.let { message ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Text(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))
+                }
+            }
             when {
                 busy != null -> Loading(busy)
                 case == null -> DescribeStep(vm.pendingFiles, onSubmit = { vm.submitDescription(it, resolver) })
                 else -> ReviewStep(case, onAnswer = vm::submitAnswer, onConfirm = { vm.search(onResults) }, onAttach = { onDocuments(case.id) })
             }
-            vm.error?.let { ErrorText(it) }
         }
     }
 }
