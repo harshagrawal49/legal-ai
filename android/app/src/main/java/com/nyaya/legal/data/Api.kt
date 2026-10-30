@@ -20,9 +20,14 @@ import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import okhttp3.MultipartBody
+import retrofit2.HttpException
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import java.util.concurrent.TimeUnit
 
@@ -35,13 +40,26 @@ interface NyayaService {
     @GET("cases/{id}/results") suspend fun results(@Path("id") id: String): List<CaseResult>
     @GET("cases/{id}/chat") suspend fun chatHistory(@Path("id") id: String): List<ChatMessage>
     @GET("judgments/{id}") suspend fun judgment(@Path("id") id: String): JudgmentDetail
+
+    @Multipart @POST("cases/{id}/documents")
+    suspend fun uploadDocument(@Path("id") id: String, @Part file: MultipartBody.Part): DocumentDetail
+    @GET("cases/{id}/documents") suspend fun documents(@Path("id") id: String): List<DocumentSummary>
+    @GET("cases/{id}/documents/{docId}")
+    suspend fun document(@Path("id") id: String, @Path("docId") docId: String): DocumentDetail
+    @POST("cases/{id}/documents/{docId}/extract")
+    suspend fun retryExtraction(@Path("id") id: String, @Path("docId") docId: String): DocumentDetail
+    @DELETE("cases/{id}/documents/{docId}")
+    suspend fun deleteDocument(@Path("id") id: String, @Path("docId") docId: String): retrofit2.Response<Unit>
+    @GET("cases/{id}/evidence") suspend fun evidence(@Path("id") id: String): Evidence
+    @POST("cases/{id}/brief") suspend fun brief(@Path("id") id: String): Brief
 }
 
 /** Events of a streamed chat reply. */
 sealed interface ChatEvent {
     data class Text(val delta: String) : ChatEvent
     data class Tool(val name: String) : ChatEvent
-    data class Done(val citedJudgments: List<String>) : ChatEvent
+    /** `unverified` holds judgment ids and "<document id>:p<N>" references the backend could not verify. */
+    data class Done(val citedJudgments: List<String>, val unverified: Set<String> = emptySet()) : ChatEvent
     data class Error(val message: String) : ChatEvent
 }
 
@@ -81,8 +99,9 @@ object Api {
                     "text" -> trySend(ChatEvent.Text(obj.string("delta")))
                     "tool" -> trySend(ChatEvent.Tool(obj.string("name")))
                     "done" -> {
-                        val cited = obj["cited_judgments"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
-                        trySend(ChatEvent.Done(cited))
+                        fun strings(key: String) = obj[key]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
+                        val unverified = strings("unverified_citations") + strings("unverified_document_citations")
+                        trySend(ChatEvent.Done(strings("cited_judgments"), unverified.toSet()))
                         close()
                     }
                     "error" -> {
@@ -104,6 +123,18 @@ object Api {
         val source = EventSources.createFactory(http.newBuilder().readTimeout(5, TimeUnit.MINUTES).build())
             .newEventSource(request, listener)
         awaitClose { source.cancel() }
+    }
+
+    /** The backend's `detail` message for HTTP errors (e.g. "Only PDF files are supported."), else a generic one. */
+    fun errorMessage(t: Throwable): String {
+        if (t is HttpException) {
+            val detail = runCatching {
+                json.parseToJsonElement(t.response()?.errorBody()?.string().orEmpty()).jsonObject["detail"]?.jsonPrimitive?.content
+            }.getOrNull()
+            return detail ?: "The server returned an error (${t.code()})."
+        }
+        if (t is IllegalStateException) return t.message ?: "Something went wrong."  // checks made in the app
+        return "Could not reach the server. Check your connection and try again."
     }
 
     private fun JsonObject.string(key: String) = this[key]?.jsonPrimitive?.content.orEmpty()

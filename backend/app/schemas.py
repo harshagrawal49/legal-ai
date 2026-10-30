@@ -87,3 +87,90 @@ class ChatMessageOut(BaseModel):
     role: str
     display_text: str
     created_at: datetime
+
+
+# ---------- Uploaded documents, evidence pack and brief ----------
+
+
+class DocumentSummaryOut(BaseModel):
+    id: uuid.UUID
+    filename: str
+    status: str  # processed | text_only | failed
+    error: str | None
+    document_type: str | None
+    page_count: int
+    created_at: datetime | None
+
+
+class DocumentOut(DocumentSummaryOut):
+    pages: list[str]
+    facts: dict
+
+
+class SourceRefOut(BaseModel):
+    document_id: str
+    filename: str
+    page: int | None
+    excerpt: str | None
+    verified: bool
+    value: str | None = None
+
+
+class TimelineItemOut(BaseModel):
+    date: str | None
+    date_as_written: str | None
+    kind: str
+    description: str
+    source: SourceRefOut
+
+
+class FlagOut(BaseModel):
+    kind: str
+    message: str
+    sources: list[SourceRefOut]
+
+
+class EvidenceOut(BaseModel):
+    timeline: list[TimelineItemOut]
+    flags: list[FlagOut]
+
+
+class SupportedFactOut(BaseModel):
+    category: str
+    text: str
+    source: SourceRefOut
+
+
+class LegalSourceOut(BaseModel):
+    judgment_id: str
+    title: str
+    court: str
+    decision_date: str | None
+    citation: str | None
+    source_url: str
+    why_it_may_matter: str
+    key_paragraphs: list[int]
+
+
+class BriefDocumentOut(BaseModel):
+    document_id: str
+    filename: str
+    status: str
+    document_type: str | None
+    page_count: int
+    error: str | None
+
+
+class BriefOut(BaseModel):
+    status: str
+    disclaimer: str
+    user_summary: str | None
+    documents: list[BriefDocumentOut]
+    chronology: list[TimelineItemOut]
+    document_supported_facts: list[SupportedFactOut]
+    user_account_not_verified: list[str]
+    gaps_and_inconsistencies: list[FlagOut]
+    legal_sources: list[LegalSourceOut]
+    advocate_questions: list[str]
+    checklist: list[str]
+    suggestions_ai_generated: bool

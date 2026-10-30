@@ -6,7 +6,7 @@ import openai
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.api import cases, judgments
+from app.api import cases, documents, judgments
 from app.db import init_db
 from app.llm.client import LLMRefusal
 
@@ -21,12 +21,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Nyaya Research API", lifespan=lifespan)
 app.include_router(cases.router)
+app.include_router(documents.router)
 app.include_router(judgments.router)
 
 
 @app.exception_handler(LLMRefusal)
 def refusal_handler(request: Request, exc: LLMRefusal):
-    return JSONResponse(status_code=422, content={"detail": "The assistant could not process this request."})
+    return JSONResponse(status_code=422, content={"detail": "The assistant can't help with this request. Describe your situation and the lawful outcome you want, or contact NALSA legal aid (15100)."})
 
 
 @app.exception_handler(openai.APIStatusError)

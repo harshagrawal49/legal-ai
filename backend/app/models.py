@@ -1,7 +1,7 @@
 """Database tables.
 
 judgments / judgment_paragraphs  -> the court data, filled by the ingestion pipeline
-cases / chat_messages / case_results -> what users create in the app
+cases / case_documents / chat_messages / case_results -> what users create in the app
 """
 
 import uuid
@@ -84,6 +84,28 @@ class Case(Base):
 
     results: Mapped[list["CaseResult"]] = relationship(order_by="CaseResult.rank", cascade="all, delete-orphan")
     messages: Mapped[list["ChatMessage"]] = relationship(order_by="ChatMessage.id", cascade="all, delete-orphan")
+    documents: Mapped[list["CaseDocument"]] = relationship(
+        order_by="CaseDocument.created_at", cascade="all, delete-orphan"
+    )
+
+
+class CaseDocument(Base):
+    """A PDF the user uploaded for a case. Only the extracted page text is kept, not the file itself.
+
+    status: processed (text + facts) | text_only (text extracted, fact extraction failed) | failed (no usable text)
+    `facts` follows app/llm/schemas.py: DocumentFacts, with a `verified` flag added to every source reference.
+    """
+
+    __tablename__ = "case_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    case_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String)
+    error: Mapped[str | None] = mapped_column(Text)
+    pages: Mapped[list] = mapped_column(JSONB, default=list)  # page text, index 0 = page 1
+    facts: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CaseResult(Base):

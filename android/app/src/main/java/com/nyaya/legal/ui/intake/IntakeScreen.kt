@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,6 +21,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,7 +78,7 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Unit) {
+fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Unit, onDocuments: (String) -> Unit) {
     val vm: IntakeViewModel = viewModel { IntakeViewModel(caseId) }
     Scaffold(
         topBar = {
@@ -84,6 +86,9 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
                 title = { Text(vm.case?.title ?: "New case") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                },
+                actions = {
+                    vm.case?.let { c -> TextButton(onClick = { onDocuments(c.id) }) { Text("My documents") } }
                 },
             )
         },
@@ -94,7 +99,7 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
             when {
                 busy != null -> Loading(busy)
                 case == null -> DescribeStep(onSubmit = vm::submitDescription)
-                else -> ReviewStep(case, onAnswer = vm::submitAnswer, onConfirm = { vm.search(onResults) })
+                else -> ReviewStep(case, onAnswer = vm::submitAnswer, onConfirm = { vm.search(onResults) }, onAttach = { onDocuments(case.id) })
             }
             vm.error?.let { ErrorText(it) }
         }
@@ -116,11 +121,12 @@ private fun DescribeStep(onSubmit: (String) -> Unit) {
         Button(onClick = { onSubmit(text.trim()) }, enabled = text.trim().length >= 20, modifier = Modifier.fillMaxWidth()) {
             Text("Continue")
         }
+        Text("You can attach documents (PDF) on the next step.", style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
-private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: () -> Unit) {
+private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: () -> Unit, onAttach: () -> Unit) {
     var answer by rememberSaveableText()
     Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (case.pendingQuestions.isNotEmpty()) {
@@ -139,6 +145,21 @@ private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: 
         )
         OutlinedButton(onClick = { onAnswer(answer.trim()); answer = "" }, enabled = answer.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
             Text("Send")
+        }
+
+        Card {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Your documents", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Attach agreements, receipts, notices or property records (PDF). They are used to build a " +
+                        "timeline, flag gaps and prepare a brief, with every item linked to its page.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = onAttach, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.AttachFile, null)
+                    Text("Attach documents", Modifier.padding(start = 8.dp))
+                }
+            }
         }
 
         Text("Our understanding of your case", style = MaterialTheme.typography.titleMedium)

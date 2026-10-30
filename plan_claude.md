@@ -354,20 +354,42 @@ project/
 
 ## 11. Definition of done for the initial build
 
-- [ ] Existing repository audited and working behavior preserved.
-- [ ] Android app builds/runs, or blockers are documented.
-- [ ] Supported PDF upload and page-level extraction work.
-- [ ] Structured facts are validated and reviewable.
-- [ ] Timeline/gap flags link to source records.
-- [ ] A small legal corpus is searchable.
-- [ ] RAG answers show real, resolvable sources.
-- [ ] The brief separates supported facts, allegations, uncertainty, and legal sources.
-- [ ] Important failure paths are tested.
-- [ ] Baseline evaluation and limitations are documented.
-- [ ] README has setup/run/test instructions.
-- [ ] No secrets are committed or embedded in the app.
-- [ ] No unsupported claims are made about legal outcomes or replacing an advocate.
-- [ ] Fine-tuning has not started during the initial build.
+- [x] Existing repository audited and working behavior preserved.
+- [ ] Android app builds/runs, or blockers are documented. *(Blocker documented: no Android SDK in the dev environment; new screens not yet compiled.)*
+- [x] Supported PDF upload and page-level extraction work.
+- [x] Structured facts are validated and reviewable.
+- [x] Timeline/gap flags link to source records.
+- [x] A small legal corpus is searchable. *(Existing Supreme Court judgment hybrid search.)*
+- [x] RAG answers show real, resolvable sources. *(Judgment and document-page citations are both checked.)*
+- [x] The brief separates supported facts, allegations, uncertainty, and legal sources.
+- [x] Important failure paths are tested.
+- [ ] Baseline evaluation and limitations are documented. *(Harness and docs done; LLM run pending an API key.)*
+- [x] README has setup/run/test instructions.
+- [x] No secrets are committed or embedded in the app.
+- [x] No unsupported claims are made about legal outcomes or replacing an advocate.
+- [x] Fine-tuning has not started during the initial build.
+
+## 11a. Progress log
+
+- **M1 Audit**: done. Stack: Kotlin/Compose + FastAPI + Postgres/pgvector, LLM via an OpenAI-compatible API.
+- **M2 PDF to facts**: done. `app/services/documents.py`, `DocumentFacts` in `app/llm/schemas.py`,
+  `CaseDocument` table, routes in `app/api/documents.py`.
+- **M3 Evidence pack**: done. `app/services/evidence.py` (deterministic, no LLM).
+- **M4 Legal RAG / QA**: reused the existing judgment search and advisor. Added the
+  `read_case_documents` tool and the `[[D:id:pN]]` citation check.
+- **F6 Brief**: done. `app/services/brief.py`, `POST /cases/{id}/brief`.
+- **M5 Android**: code written (My documents, document review, brief screens, chat document
+  citations), but **not compiled**: no Android SDK on the dev machine. Next step: `./gradlew assembleDebug`.
+- **M6 Tests/eval**: 31 backend tests pass. `eval/run_eval.py` and `docs/evaluation.md` added. The
+  deterministic eval passes; the LLM eval (`--llm`) still needs an API key.
+- **Safety guardrails**: `SAFETY_RULES` added to all user-facing prompts, plus a safe fallback for
+  blocked chat replies; red-team set `eval/safety_cases.py` (17 cases) with runner
+  `eval/run_safety_eval.py`; `tests/test_safety.py`. 38 tests pass. The red-team run needs an API key.
+- **Case workspace + chat context**: opening a case now goes to a case home screen (`ui/cases/CaseScreen.kt`)
+  with "Chat about this case" as the main action. The chat's case context (fact sheet, documents, search
+  results) is rebuilt on every turn instead of being stored once, so chat stays current. 39 tests pass.
+- **Remaining**: compile and test the Android build; run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
+  plus representative errors in `docs/evaluation.md`; add a retrieval eval with fixed questions.
 
 ## 12. First action
 

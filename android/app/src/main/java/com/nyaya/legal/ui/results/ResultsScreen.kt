@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,13 +62,20 @@ class ResultsViewModel(caseId: String) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ResultsScreen(caseId: String, onBack: () -> Unit, onOpenJudgment: (String) -> Unit, onChat: () -> Unit) {
+fun ResultsScreen(
+    caseId: String,
+    onBack: () -> Unit,
+    onOpenJudgment: (String) -> Unit,
+    onChat: () -> Unit,
+    onDocuments: () -> Unit,
+) {
     val vm: ResultsViewModel = viewModel { ResultsViewModel(caseId) }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Similar cases") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                actions = { TextButton(onClick = onDocuments) { Text("My documents") } },
             )
         },
         floatingActionButton = {

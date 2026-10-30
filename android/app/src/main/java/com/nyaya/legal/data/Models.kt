@@ -111,3 +111,91 @@ data class IntakeAnswerRequest(val text: String)
 
 @Serializable
 data class ChatRequest(val message: String)
+
+// ---------- Uploaded documents, evidence pack and brief ----------
+
+@Serializable
+data class DocumentSummary(
+    val id: String,
+    val filename: String,
+    val status: String, // processed | text_only | failed
+    val error: String? = null,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+)
+
+@Serializable
+data class DocumentDetail(
+    val id: String,
+    val filename: String,
+    val status: String,
+    val error: String? = null,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+    val pages: List<String> = emptyList(),
+    val facts: JsonObject = JsonObject(emptyMap()), // backend/app/llm/schemas.py: DocumentFacts
+)
+
+@Serializable
+data class SourceRef(
+    @SerialName("document_id") val documentId: String,
+    val filename: String,
+    val page: Int? = null,
+    val excerpt: String? = null,
+    val verified: Boolean = false,
+    val value: String? = null,
+)
+
+@Serializable
+data class TimelineItem(
+    val date: String? = null,
+    @SerialName("date_as_written") val dateAsWritten: String? = null,
+    val kind: String,
+    val description: String,
+    val source: SourceRef,
+)
+
+@Serializable
+data class Flag(val kind: String, val message: String, val sources: List<SourceRef> = emptyList())
+
+@Serializable
+data class Evidence(val timeline: List<TimelineItem> = emptyList(), val flags: List<Flag> = emptyList())
+
+@Serializable
+data class SupportedFact(val category: String, val text: String, val source: SourceRef)
+
+@Serializable
+data class LegalSource(
+    @SerialName("judgment_id") val judgmentId: String,
+    val title: String,
+    val court: String,
+    @SerialName("decision_date") val decisionDate: String? = null,
+    val citation: String? = null,
+    @SerialName("why_it_may_matter") val whyItMayMatter: String,
+    @SerialName("key_paragraphs") val keyParagraphs: List<Int> = emptyList(),
+)
+
+@Serializable
+data class Brief(
+    val disclaimer: String,
+    @SerialName("user_summary") val userSummary: String? = null,
+    val documents: List<BriefDocument> = emptyList(),
+    val chronology: List<TimelineItem> = emptyList(),
+    @SerialName("document_supported_facts") val supportedFacts: List<SupportedFact> = emptyList(),
+    @SerialName("user_account_not_verified") val userAccount: List<String> = emptyList(),
+    @SerialName("gaps_and_inconsistencies") val gaps: List<Flag> = emptyList(),
+    @SerialName("legal_sources") val legalSources: List<LegalSource> = emptyList(),
+    @SerialName("advocate_questions") val advocateQuestions: List<String> = emptyList(),
+    val checklist: List<String> = emptyList(),
+    @SerialName("suggestions_ai_generated") val suggestionsAiGenerated: Boolean = false,
+)
+
+@Serializable
+data class BriefDocument(
+    @SerialName("document_id") val documentId: String,
+    val filename: String,
+    val status: String,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+    val error: String? = null,
+)

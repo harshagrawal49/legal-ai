@@ -1,0 +1,162 @@
+package com.nyaya.legal.ui.documents
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nyaya.legal.data.Api
+import com.nyaya.legal.data.DocumentDetail
+import com.nyaya.legal.data.SourceRef
+import com.nyaya.legal.ui.ErrorText
+import com.nyaya.legal.ui.Loading
+import com.nyaya.legal.ui.text
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+class DocumentViewModel(caseId: String, docId: String) : ViewModel() {
+    var document by mutableStateOf<DocumentDetail?>(null)
+        private set
+    var error by mutableStateOf<String?>(null)
+        private set
+
+    init {
+        viewModelScope.launch {
+            runCatching { Api.service.document(caseId, docId) }
+                .onSuccess { document = it }
+                .onFailure { error = Api.errorMessage(it) }
+        }
+    }
+}
+
+/** One extracted item: its text and the page reference the extraction gave for it. */
+private data class FactRow(val text: String, val source: SourceRef?)
+
+// Sections of DocumentFacts (backend/app/llm/schemas.py) and how to describe each item.
+private val SECTIONS: List<Pair<String, Pair<String, (JsonObject) -> String>>> = listOf(
+    "parties" to ("Parties" to { o -> o.text("name").orEmpty() + (o.text("stated_role")?.let { " ($it)" } ?: "") }),
+    "property_identifiers" to ("Property identifiers" to { o -> "${o.text("kind")}: ${o.text("value")}" }),
+    "amounts" to ("Amounts" to { o -> "${o.text("description")}: ${o.text("value")}" }),
+    "events" to ("Events" to { o -> listOfNotNull(o.text("date") ?: o.text("date_as_written"), o.text("description")).joinToString(": ") }),
+    "clauses" to ("Clauses" to { o -> o.text("summary").orEmpty() }),
+    "referenced_documents" to ("Documents it mentions" to { o -> o.text("description").orEmpty() }),
+    "uncertainties" to ("Unclear or inconsistent" to { o -> o.text("description").orEmpty() }),
+)
+
+private fun JsonObject.sourceRef(doc: DocumentDetail): SourceRef? {
+    val s = this["source"] as? JsonObject ?: return null
+    return SourceRef(
+        documentId = doc.id,
+        filename = doc.filename,
+        page = s["page"]?.jsonPrimitive?.intOrNull,
+        excerpt = s.text("excerpt"),
+        verified = s["verified"]?.jsonPrimitive?.booleanOrNull ?: false,
+    )
+}
+
+private fun rows(doc: DocumentDetail, key: String, describe: (JsonObject) -> String): List<FactRow> =
+    (doc.facts[key] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map { FactRow(describe(it), it.sourceRef(doc)) }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DocumentScreen(caseId: String, docId: String, page: Int?, onBack: () -> Unit) {
+    val vm: DocumentViewModel = viewModel { DocumentViewModel(caseId, docId) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val doc = vm.document
+    val sections = doc?.let { d -> SECTIONS.map { (key, spec) -> spec.first to rows(d, key, spec.second) }.filter { it.second.isNotEmpty() } }
+    // Items before the page texts: notice, header, one per section. Used to jump to a cited page.
+    val firstPageIndex = 2 + (sections?.size ?: 0)
+
+    LaunchedEffect(doc, page) {
+        if (doc != null && page != null && page in 1..doc.pages.size) listState.scrollToItem(firstPageIndex + page - 1)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(doc?.filename ?: "Document") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+            )
+        },
+    ) { padding ->
+        when {
+            vm.error != null -> ErrorText(vm.error!!, Modifier.padding(padding))
+            doc == null || sections == null -> Column(Modifier.padding(padding)) { Loading("Loading…") }
+            else -> LazyColumn(
+                Modifier.fillMaxSize().padding(padding),
+                state = listState,
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item { PreparationNotice() }
+                item {
+                    Text(
+                        listOfNotNull(doc.documentType?.let(::humanise), doc.facts.text("document_date")?.let { "dated $it" })
+                            .joinToString(", ").ifEmpty { "Extracted facts" },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    doc.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    if (doc.facts.isEmpty() && doc.error == null) Text("No facts were extracted from this document.")
+                }
+                sections.forEach { (title, items) ->
+                    item {
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(title, fontWeight = FontWeight.SemiBold)
+                                items.forEach { row ->
+                                    Text(row.text, style = MaterialTheme.typography.bodyMedium)
+                                    row.source?.let { ref ->
+                                        ref.excerpt?.let { Text("“$it”", style = MaterialTheme.typography.bodySmall) }
+                                        // Tapping scrolls to the page text further down this screen.
+                                        SourceLink(ref) { _, p ->
+                                            if (p != null && p in 1..doc.pages.size) {
+                                                scope.launch { listState.animateScrollToItem(firstPageIndex + p - 1) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                itemsIndexed(doc.pages) { i, text ->
+                    Column {
+                        Text("Page ${i + 1}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        Text(text.trim(), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
