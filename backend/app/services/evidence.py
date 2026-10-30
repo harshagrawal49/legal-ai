@@ -101,7 +101,9 @@ def build_flags(docs: list[CaseDocument]) -> list[dict]:
     processed = _processed(docs)
 
     for doc in docs:
-        if doc.status != "processed":
+        if doc.status == "processing":
+            flags.append(_flag("still_processing", f"{doc.filename}: still being analysed. Refresh in a moment.", [source_ref(doc, None)]))
+        elif doc.status != "processed":
             flags.append(_flag("extraction_failure", f"{doc.filename}: {doc.error or 'not processed'}", [source_ref(doc, None)]))
         elif doc.facts.get("truncated_after_page"):
             flags.append(_flag(

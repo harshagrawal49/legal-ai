@@ -127,7 +127,11 @@ fun DocumentScreen(caseId: String, docId: String, page: Int?, onBack: () -> Unit
                         style = MaterialTheme.typography.titleMedium,
                     )
                     doc.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    if (doc.facts.isEmpty() && doc.error == null) Text("No facts were extracted from this document.")
+                    if (doc.status == "processing") {
+                        Text("Facts are still being extracted. Go back and reopen in a moment; the page text is below.")
+                    } else if (doc.facts.isEmpty() && doc.error == null) {
+                        Text("No facts were extracted from this document.")
+                    }
                 }
                 sections.forEach { (title, items) ->
                     item {

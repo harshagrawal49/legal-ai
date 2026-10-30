@@ -1,4 +1,5 @@
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 import openai
@@ -7,8 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api import cases, documents, judgments
-from app.db import init_db
+from app.db import SessionLocal, init_db
 from app.llm.client import LLMRefusal
+from app.services import documents as documents_service
+from app.services.embeddings import embed_query
 
 log = logging.getLogger("uvicorn.error")
 
@@ -16,6 +19,10 @@ log = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    with SessionLocal() as db:
+        documents_service.recover_interrupted(db)
+    # Load the embedding model now rather than on the first search (saves several seconds there).
+    threading.Thread(target=lambda: embed_query("warm up"), daemon=True).start()
     yield
 
 

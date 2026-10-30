@@ -98,6 +98,7 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
                     filenames = filenames + (doc.id to doc.filename)
                     val result = when (doc.status) {
                         "processed" -> "${doc.pageCount} pages read. You can now ask about it."
+                        "processing" -> "${doc.pageCount} pages read. Facts are being extracted; you can already ask about it."
                         else -> doc.error ?: "It could not be processed."
                     }
                     messages.add(UiMessage(fromUser = false, text = "Attached ${doc.filename}: $result", notice = true))

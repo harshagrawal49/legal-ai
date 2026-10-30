@@ -36,6 +36,11 @@ def case(monkeypatch):
         )
 
     monkeypatch.setattr(documents, "structured", fake_structured)
+
+    def extract_now(document_id):  # the real one opens its own DB session
+        documents._run_extraction(next(d for d in case.documents if d.id == document_id))
+
+    monkeypatch.setattr(documents, "extract_in_background", extract_now)
     yield case
     app.dependency_overrides.clear()
 
@@ -51,9 +56,12 @@ def test_upload_extract_list_get_delete(case):
     resp = _upload(case, make_pdf(SAMPLES["advance_receipt.pdf"]))
     assert resp.status_code == 201, resp.text
     body = resp.json()
-    assert body["status"] == "processed" and body["page_count"] == 1
-    assert body["facts"]["document_date_source"]["verified"] is True
+    # Text is ready at once; facts are extracted in the background.
+    assert body["status"] == "processing" and body["page_count"] == 1
     doc_id = body["id"]
+    detail = client.get(f"/cases/{case.id}/documents/{doc_id}").json()
+    assert detail["status"] == "processed"
+    assert detail["facts"]["document_date_source"]["verified"] is True
 
     assert [d["id"] for d in client.get(f"/cases/{case.id}/documents").json()] == [doc_id]
     assert "123/A" in client.get(f"/cases/{case.id}/documents/{doc_id}").json()["pages"][0]

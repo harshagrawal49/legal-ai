@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
 
 from app.api.deps import DB, UserCase
 from app.models import Case, CaseDocument
@@ -36,8 +36,9 @@ def _get_document(case: Case, document_id: uuid.UUID) -> CaseDocument:
 
 
 @router.post("/documents", response_model=DocumentOut, status_code=201)
-async def upload_document(file: UploadFile, case: UserCase, db: DB):
-    """Upload a PDF. Text is extracted page by page, then candidate facts with page references.
+async def upload_document(file: UploadFile, case: UserCase, db: DB, background: BackgroundTasks):
+    """Upload a PDF. Text is extracted page by page straight away; candidate facts with page references
+    are extracted in the background (status `processing` until done; poll the document).
 
     Unusable PDFs (scanned, encrypted, damaged) are stored with status `failed` and the reason, so they
     appear in the brief. Non-PDFs and oversized files are rejected and not stored.
@@ -48,6 +49,8 @@ async def upload_document(file: UploadFile, case: UserCase, db: DB):
     except documents.DocumentError as e:
         raise HTTPException(ERROR_STATUS.get(e.code, 422), e.message)
     db.commit()
+    if doc.status == "processing":
+        background.add_task(documents.extract_in_background, doc.id)
     return _detail(doc)
 
 
@@ -62,10 +65,12 @@ def get_document(document_id: uuid.UUID, case: UserCase):
 
 
 @router.post("/documents/{document_id}/extract", response_model=DocumentOut)
-def retry_extraction(document_id: uuid.UUID, case: UserCase, db: DB):
-    """Re-run fact extraction, e.g. after it failed because the AI service was busy."""
-    doc = documents.retry_extraction(_get_document(case, document_id))
+def retry_extraction(document_id: uuid.UUID, case: UserCase, db: DB, background: BackgroundTasks):
+    """Re-run fact extraction in the background, e.g. after it failed because the AI service was busy."""
+    doc = documents.mark_for_retry(_get_document(case, document_id))
     db.commit()
+    if doc.status == "processing":
+        background.add_task(documents.extract_in_background, doc.id)
     return _detail(doc)
 
 

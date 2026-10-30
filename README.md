@@ -94,6 +94,20 @@ uv run python -c "from eval.samples import SAMPLES, make_pdf; [open(f'/tmp/{n}',
 `http://10.0.2.2:8000/`, which is your machine as seen from the emulator. From the command line,
 run `cd android && ./gradlew assembleDebug`.
 
+## Speed (Gemini free tier)
+
+- **Two model tiers**: `MODEL_FAST` (flash-lite) for intake, document extraction and the brief;
+  `MODEL_MAIN` (flash) for search analysis and chat.
+- **Short thinking**: every call sends `reasoning_effort=low` (`LLM_REASONING_EFFORT`). It's dropped
+  automatically if the provider rejects it.
+- **No wasted calls**: if a model rejects JSON-schema output once, later calls go straight to JSON mode.
+- **Fail fast**: 2 retries and a 90 s timeout instead of waiting minutes on rate limits; the app shows "busy, try again".
+- **Uploads return at once**: page text is extracted during the upload; LLM fact extraction runs in
+  the background (`processing`) while the app polls.
+- **Smaller prompts**: search sends 8 candidates with 2 short paragraphs each (was 15 × 4); chat uses
+  at most 3 tool rounds; the embedding model loads at startup.
+- **Measure it**: every LLM call logs `llm <task> model=… <seconds>s in=<tokens> out=<tokens>` in the server log.
+
 ## Safety guardrails
 
 - **Prompt rules** (`SAFETY_RULES` in `app/llm/prompts.py`, used by every prompt that talks to users):

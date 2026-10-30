@@ -2,6 +2,9 @@
 
 Nothing is ever made up to replace a failed step: a PDF without usable text is stored as `failed`
 with the reason, and a document whose fact extraction failed keeps its text as `text_only`.
+
+Text extraction is instant and happens during the upload; the slower LLM fact extraction runs in
+the background (status `processing`), so the upload returns straight away and the app polls.
 """
 
 import logging
@@ -13,6 +16,8 @@ from datetime import datetime, timezone
 import openai
 import pymupdf
 
+from app.config import get_settings
+from app.db import SessionLocal
 from app.llm import prompts
 from app.llm.client import LLMRefusal, structured
 from app.llm.schemas import DocumentFacts
@@ -129,7 +134,9 @@ def _wrap(filename: str, parts: list[str]) -> str:
 def extract_facts(filename: str, pages: list[str]) -> dict:
     """LLM extraction validated against DocumentFacts, then dates and page references checked in code."""
     user_prompt, truncated_after = _document_prompt(filename, pages)
-    facts = structured(DocumentFacts, prompts.DOCUMENT_EXTRACTION_SYSTEM, user_prompt).model_dump()
+    facts = structured(
+        DocumentFacts, prompts.DOCUMENT_EXTRACTION_SYSTEM, user_prompt, model=get_settings().model_fast
+    ).model_dump()
     _clean_dates(facts)
     verify_sources(facts, pages)
     facts["truncated_after_page"] = truncated_after
@@ -162,12 +169,33 @@ def add_document(case: Case, filename: str, data: bytes) -> CaseDocument:
     except DocumentError as e:
         doc.status, doc.error = "failed", e.message
     else:
-        _run_extraction(doc)
+        doc.status = "processing"  # facts are extracted by extract_in_background
     case.documents.append(doc)
     return doc
 
 
-def retry_extraction(doc: CaseDocument) -> CaseDocument:
+def mark_for_retry(doc: CaseDocument) -> CaseDocument:
     if doc.pages:
-        _run_extraction(doc)
+        doc.status, doc.error = "processing", None
     return doc
+
+
+def extract_in_background(document_id: uuid.UUID) -> None:
+    """Run fact extraction for an uploaded document in its own database session."""
+    with SessionLocal() as db:
+        doc = db.get(CaseDocument, document_id)
+        if doc is None or doc.status != "processing":
+            return
+        try:
+            _run_extraction(doc)
+        except Exception:  # never leave a document stuck in `processing`
+            log.exception("fact extraction crashed for document %s", document_id)
+            doc.status, doc.error = "text_only", "Fact extraction failed. Try again."
+        db.commit()
+
+
+def recover_interrupted(db) -> None:
+    """At startup: documents left `processing` by a restart can be retried by the user."""
+    for doc in db.query(CaseDocument).filter(CaseDocument.status == "processing"):
+        doc.status, doc.error = "text_only", "Processing was interrupted. Try extraction again."
+    db.commit()

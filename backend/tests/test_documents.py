@@ -87,6 +87,8 @@ def test_llm_failure_keeps_text(monkeypatch):
 
     monkeypatch.setattr(documents, "structured", boom)
     doc = documents.add_document(Case(user_id="u"), "a.pdf", make_pdf(SAMPLES["advance_receipt.pdf"]))
+    assert doc.status == "processing" and "123/A" in doc.pages[0]  # text is ready before facts
+    documents._run_extraction(doc)
     assert doc.status == "text_only"
     assert "123/A" in doc.pages[0]
 

@@ -1,5 +1,10 @@
 package com.nyaya.legal.ui.intake
 
+import android.content.ContentResolver
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +46,14 @@ import com.nyaya.legal.data.IntakeAnswerRequest
 import com.nyaya.legal.data.NewCaseRequest
 import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.Loading
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import com.nyaya.legal.data.PDF_MIME
+import com.nyaya.legal.data.uploadPdf
 import kotlinx.coroutines.launch
 
 class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
@@ -55,8 +68,19 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
         existingCaseId?.let { id -> run("Loading…") { case = Api.service.getCase(id) } }
     }
 
-    fun submitDescription(text: String) = run("Understanding your case…") {
-        case = Api.service.createCase(NewCaseRequest(text))
+    /** PDFs picked on the first step, before the case exists: (uri, file name). Uploaded after creation. */
+    val pendingFiles = mutableStateListOf<Pair<Uri, String>>()
+
+    fun submitDescription(text: String, resolver: ContentResolver) = run("Understanding your case…") {
+        val created = Api.service.createCase(NewCaseRequest(text))
+        case = created
+        val failed = mutableListOf<String>()
+        pendingFiles.forEachIndexed { i, (uri, name) ->
+            busy = "Uploading documents (${i + 1}/${pendingFiles.size})…"
+            runCatching { uploadPdf(resolver, created.id, uri) }.onFailure { failed += "$name: ${Api.errorMessage(it)}" }
+        }
+        pendingFiles.clear()
+        if (failed.isNotEmpty()) error = "Some documents were not uploaded:\n" + failed.joinToString("\n")
     }
 
     fun submitAnswer(text: String) = run("Updating the summary…") {
@@ -71,7 +95,7 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
     private fun run(message: String, block: suspend () -> Unit) = viewModelScope.launch {
         busy = message
         error = null
-        runCatching { block() }.onFailure { error = "Something went wrong: ${it.message}" }
+        runCatching { block() }.onFailure { error = Api.errorMessage(it) }
         busy = null
     }
 }
@@ -80,6 +104,7 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
 @Composable
 fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Unit, onDocuments: (String) -> Unit) {
     val vm: IntakeViewModel = viewModel { IntakeViewModel(caseId) }
+    val resolver = LocalContext.current.contentResolver
     Scaffold(
         topBar = {
             TopAppBar(
@@ -98,7 +123,7 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
             val case = vm.case
             when {
                 busy != null -> Loading(busy)
-                case == null -> DescribeStep(onSubmit = vm::submitDescription)
+                case == null -> DescribeStep(vm.pendingFiles, onSubmit = { vm.submitDescription(it, resolver) })
                 else -> ReviewStep(case, onAnswer = vm::submitAnswer, onConfirm = { vm.search(onResults) }, onAttach = { onDocuments(case.id) })
             }
             vm.error?.let { ErrorText(it) }
@@ -107,23 +132,49 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
 }
 
 @Composable
-private fun DescribeStep(onSubmit: (String) -> Unit) {
+private fun DescribeStep(files: MutableList<Pair<Uri, String>>, onSubmit: (String) -> Unit) {
     var text by rememberSaveableText()
+    val resolver = LocalContext.current.contentResolver
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        uris.filter { u -> files.none { it.first == u } }.forEach { files += it to displayName(resolver, it) }
+    }
     Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("What happened?", style = MaterialTheme.typography.titleLarge)
         Text("Describe your situation in your own words: who is involved, what was agreed, what went wrong and what you want. No legal terms needed.")
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
-            placeholder = { Text("e.g. I paid for a flat in 2019 but the builder hasn't given possession or refunded my money…") },
+            placeholder = { Text("e.g. I paid an advance for a plot in 2023, but the seller agreed to sell it to someone else…") },
             modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
         )
+
+        Text("Documents (optional)", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Agreement to sell, receipts, notices, property records (text-based PDF, up to 10 MB each).",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        files.forEach { (uri, name) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Description, null)
+                Text(name, Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1)
+                IconButton(onClick = { files.removeAll { it.first == uri } }) { Icon(Icons.Default.Close, "Remove $name") }
+            }
+        }
+        OutlinedButton(onClick = { picker.launch(PDF_MIME) }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.AttachFile, null)
+            Text(if (files.isEmpty()) "Attach documents" else "Attach more", Modifier.padding(start = 8.dp))
+        }
+
         Button(onClick = { onSubmit(text.trim()) }, enabled = text.trim().length >= 20, modifier = Modifier.fillMaxWidth()) {
             Text("Continue")
         }
-        Text("You can attach documents (PDF) on the next step.", style = MaterialTheme.typography.bodySmall)
     }
 }
+
+private fun displayName(resolver: ContentResolver, uri: Uri): String =
+    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) c.getString(0) else null
+    } ?: "document.pdf"
 
 @Composable
 private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: () -> Unit, onAttach: () -> Unit) {

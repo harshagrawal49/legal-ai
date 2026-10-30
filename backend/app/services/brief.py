@@ -11,6 +11,7 @@ import logging
 
 import openai
 
+from app.config import get_settings
 from app.llm import prompts
 from app.llm.client import LLMRefusal, structured
 from app.llm.schemas import BriefSuggestions
@@ -88,7 +89,10 @@ def _legal_sources(case: Case) -> list[dict]:
 
 
 def _fallback_suggestions(flags: list[dict]) -> BriefSuggestions:
-    questions = [f"How should this be addressed: {f['message']}" for f in flags if f["kind"] != "extraction_failure"]
+    questions = [
+        f"How should this be addressed: {f['message']}"
+        for f in flags if f["kind"] not in ("extraction_failure", "still_processing")
+    ]
     checklist = [f"Re-upload or obtain a readable copy: {f['message']}" for f in flags if f["kind"] == "extraction_failure"]
     return BriefSuggestions(advocate_questions=questions[:8], checklist=checklist[:8])
 
@@ -105,6 +109,8 @@ def _suggestions(case: Case, facts: list[dict], flags: list[dict]) -> tuple[Brie
             BriefSuggestions,
             prompts.BRIEF_SUGGESTIONS_SYSTEM,
             f"<case_material>\n{json.dumps(material, ensure_ascii=False, indent=1)}\n</case_material>",
+            model=get_settings().model_fast,
+            max_tokens=2000,
         ), True
     except (openai.APIError, LLMRefusal, RuntimeError) as e:
         log.warning("brief suggestions failed for case %s: %s", case.id, type(e).__name__)

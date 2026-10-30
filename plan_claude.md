@@ -388,6 +388,10 @@ project/
 - **Case workspace + chat context**: opening a case now goes to a case home screen (`ui/cases/CaseScreen.kt`)
   with "Chat about this case" as the main action. The chat's case context (fact sheet, documents, search
   results) is rebuilt on every turn instead of being stored once, so chat stays current. 39 tests pass.
+- **Speed + first-run UX**: fast/main model tiers, low reasoning effort, fewer retries, schema-fallback
+  memo, background fact extraction with polling, smaller search prompt, at most 3 chat tool rounds,
+  per-call timing logs. Android: attach PDFs on the first intake step, case home after search,
+  feature intro on the empty case list. 42 tests pass.
 - **Remaining**: compile and test the Android build; run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
   plus representative errors in `docs/evaluation.md`; add a retrieval eval with fixed questions.
 

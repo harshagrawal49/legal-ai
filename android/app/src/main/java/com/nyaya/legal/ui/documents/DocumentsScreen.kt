@@ -55,6 +55,8 @@ import com.nyaya.legal.data.TimelineItem
 import com.nyaya.legal.data.uploadPdf
 import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.Loading
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class DocumentsViewModel(private val caseId: String) : ViewModel() {
@@ -71,12 +73,27 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
         refresh()
     }
 
+    private var polling: Job? = null
+
     fun refresh() {
         viewModelScope.launch {
             runCatching {
                 documents = Api.service.documents(caseId)
                 evidence = Api.service.evidence(caseId)
             }.onFailure { error = Api.errorMessage(it) }
+            pollWhileProcessing()
+        }
+    }
+
+    /** Fact extraction runs in the background on the server; check every few seconds until it's done. */
+    private fun pollWhileProcessing() {
+        if (polling?.isActive == true || documents.orEmpty().none { it.status == "processing" }) return
+        polling = viewModelScope.launch {
+            while (documents.orEmpty().any { it.status == "processing" }) {
+                delay(3000)
+                runCatching { documents = Api.service.documents(caseId) }
+            }
+            runCatching { evidence = Api.service.evidence(caseId) }
         }
     }
 
@@ -90,7 +107,7 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
         }
     }
 
-    fun upload(resolver: ContentResolver, uri: Uri) = run("Reading the document and extracting facts…") {
+    fun upload(resolver: ContentResolver, uri: Uri) = run("Uploading…") {
         uploadPdf(resolver, caseId, uri)
     }
 
@@ -253,6 +270,7 @@ fun SectionTitle(text: String) {
 fun humanise(value: String) = value.replace('_', ' ').replaceFirstChar { it.uppercase() }
 
 private fun statusLabel(status: String) = when (status) {
+    "processing" -> "Extracting facts…"
     "processed" -> "Processed"
     "text_only" -> "Text only"
     else -> "Not readable"

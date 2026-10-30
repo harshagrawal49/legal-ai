@@ -99,14 +99,16 @@ def _candidate_block(db: Session, cand: Candidate) -> str:
     j = db.get(Judgment, cand.judgment_id)
     paras = db.scalars(
         select(JudgmentParagraph).where(
-            JudgmentParagraph.judgment_id == j.id, JudgmentParagraph.para_no.in_(cand.para_nos[:4])
+            JudgmentParagraph.judgment_id == j.id, JudgmentParagraph.para_no.in_(cand.para_nos[:2])
         )
     ).all()
-    matched = "\n".join(f"[¶{p.para_no}] {p.text[:1200]}" for p in paras)
+    matched = "\n".join(f"[¶{p.para_no}] {p.text[:700]}" for p in paras)
+    # Only the summary fields the analysis needs, to keep the prompt (and the wait) short.
+    summary = {k: j.summary.get(k) for k in ("facts", "issues", "holding", "outcome") if j.summary and j.summary.get(k)}
     return (
         f'<judgment judgment_id="{j.id}">\n'
         f"Title: {j.title}\nCourt: {j.court}\nDate: {j.decision_date}\nDisposal: {j.disposal}\n"
-        f"Summary: {json.dumps(j.summary, ensure_ascii=False)}\n"
+        f"Summary: {json.dumps(summary, ensure_ascii=False)}\n"
         f"Matching paragraphs:\n{matched}\n</judgment>"
     )
 
@@ -125,7 +127,7 @@ def find_similar_cases(db: Session, case: Case) -> list[CaseResult]:
         f"<user_case>\n{json.dumps(fs, ensure_ascii=False, indent=1)}\n</user_case>\n\n"
         f"<candidates>\n{blocks}\n</candidates>"
     )
-    analysis = structured(SearchAnalysis, prompts.SEARCH_ANALYSIS_SYSTEM, user_prompt)
+    analysis = structured(SearchAnalysis, prompts.SEARCH_ANALYSIS_SYSTEM, user_prompt, max_tokens=4000)
 
     # Keep only IDs we actually sent (guards against invented citations), best first.
     valid_ids = {c.judgment_id for c in candidates}

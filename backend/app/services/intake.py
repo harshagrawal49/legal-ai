@@ -2,6 +2,7 @@
 
 import json
 
+from app.config import get_settings
 from app.llm import prompts
 from app.llm.client import structured
 from app.llm.schemas import IntakeResult
@@ -27,7 +28,7 @@ def run_intake(case: Case) -> IntakeResult:
             "</current_fact_sheet>\nUpdate this fact sheet with the new information."
         )
 
-    result = structured(IntakeResult, prompts.INTAKE_SYSTEM, user_prompt)
+    result = structured(IntakeResult, prompts.INTAKE_SYSTEM, user_prompt, model=get_settings().model_fast)
 
     case.title = result.case_title
     case.fact_sheet = result.fact_sheet.model_dump()
