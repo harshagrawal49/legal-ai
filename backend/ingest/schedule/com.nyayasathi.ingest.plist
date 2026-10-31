@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Weekly judgment ingestion on macOS (launchd). Runs every Sunday at 02:00 when the Mac is awake.
+
+  1. Replace /PATH/TO/legal-ai with the repo path (twice) and check the path to `uv` (`which uv`).
+  2. cp ingest/schedule/com.nyayasathi.ingest.plist ~/Library/LaunchAgents/
+  3. launchctl load ~/Library/LaunchAgents/com.nyayasathi.ingest.plist
+     (test now: launchctl start com.nyayasathi.ingest; logs in /tmp/nyayasathi-ingest.log)
+  Postgres must be running (docker compose up -d).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.nyayasathi.ingest</string>
+  <key>WorkingDirectory</key><string>/PATH/TO/legal-ai/backend</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/uv</string><string>run</string><string>python</string><string>-m</string><string>ingest</string><string>-q</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/tmp/nyayasathi-ingest.log</string>
+  <key>StandardErrorPath</key><string>/tmp/nyayasathi-ingest.log</string>
+</dict>
+</plist>

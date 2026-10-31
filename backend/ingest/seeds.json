@@ -1,0 +1,35 @@
+{
+  "note": "Stage-3 seeds: short hand-written descriptions of property disputes (positive) and of look-alike matters that are not (negative). Judgments are compared with these by embedding similarity. Replace or extend with real judgment openings once a labelled sample exists (ingest_plan.md §10).",
+  "positive": [
+    {"tag": "sale_contract", "text": "Suit for specific performance of an agreement to sell immovable property; the purchaser paid earnest money and was ready and willing to pay the balance sale consideration, but the vendor refused to execute the sale deed."},
+    {"tag": "sale_contract", "text": "The buyer seeks refund of the advance paid under an agreement for sale of a plot after the seller sold the same land to a third party."},
+    {"tag": "title_ownership", "text": "Suit for declaration of title over the suit property and cancellation of a registered sale deed alleged to be void."},
+    {"tag": "title_ownership", "text": "Dispute over ownership of agricultural land based on a gift deed and a subsequent sale deed executed by the original owner."},
+    {"tag": "possession_injunction", "text": "Suit for recovery of possession of the suit premises and permanent injunction restraining the defendants from encroaching upon the land."},
+    {"tag": "partition_inheritance", "text": "Partition suit among coparceners claiming shares in ancestral joint family property under the Hindu Succession Act."},
+    {"tag": "land_records", "text": "Challenge to a mutation entry in the revenue records and the record of rights for a survey number, ordered by the Tehsildar."},
+    {"tag": "land_acquisition", "text": "Land owners seek enhancement of compensation for land acquired by the State under the Land Acquisition Act for a public purpose."},
+    {"tag": "tenancy_rent", "text": "Landlord's petition for eviction of the tenant from the rented premises for bona fide personal need and arrears of rent under the Rent Control Act."},
+    {"tag": "builder_rera", "text": "Flat buyers complain against the builder for delay in handing over possession of apartments and seek refund with interest under RERA."},
+    {"tag": "easement", "text": "Dispute about an easementary right of way across the neighbour's land to reach the plaintiff's house."},
+    {"tag": "adverse_possession", "text": "The plaintiff claims title to the land by adverse possession, having been in open and continuous possession for more than twelve years."},
+    {"tag": "property_fraud", "text": "The accused forged a sale deed and impersonated the owner to sell land belonging to the complainant; cheating and forgery in a property transaction."},
+    {"tag": "benami_mortgage", "text": "Suit for redemption of a mortgage over a house property and a dispute whether the property was held benami."},
+    {"tag": "possession_injunction", "text": "Appeal against a decree granting a temporary injunction restraining alienation of the suit schedule property pending the suit."},
+    {"tag": "land_records", "text": "Dispute over khasra and khatauni entries for agricultural land and the names recorded in the jamabandi."}
+  ],
+  "negative": [
+    {"tag": "ndps", "text": "Appeal against conviction for possession of ganja and heroin under the NDPS Act; recovery of contraband from the accused."},
+    {"tag": "arms", "text": "The accused was found in possession of an unlicensed firearm and cartridges and was convicted under the Arms Act."},
+    {"tag": "bail", "text": "Application for regular bail by an accused in custody for offences of murder and criminal conspiracy."},
+    {"tag": "tax", "text": "Income tax appeal on assessment of rental income from house property and disallowance of deductions."},
+    {"tag": "service", "text": "Writ petition by a government employee challenging denial of promotion, seniority and pension benefits."},
+    {"tag": "matrimonial", "text": "Petition for divorce on grounds of cruelty and claim for maintenance by the wife under Section 125."},
+    {"tag": "motor_accident", "text": "Claim for compensation by the family of a victim who died in a motor vehicle accident before the tribunal."},
+    {"tag": "arbitration", "text": "Petition under the Arbitration and Conciliation Act to appoint an arbitrator in a commercial supply contract dispute."},
+    {"tag": "criminal_general", "text": "Criminal appeal against conviction for murder based on circumstantial evidence and the testimony of eyewitnesses."},
+    {"tag": "company", "text": "Company petition alleging oppression and mismanagement by directors and shareholders of a private company."},
+    {"tag": "election", "text": "Election petition challenging the result of a municipal election on grounds of corrupt practices."},
+    {"tag": "cheque", "text": "Complaint for dishonour of a cheque issued towards repayment of a hand loan under Section 138 of the Negotiable Instruments Act."}
+  ]
+}

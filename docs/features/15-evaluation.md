@@ -44,12 +44,12 @@ a separate check on 10–20 real, permissioned documents labelled by two people.
 | Bad source references rejected | 800/800 |
 | Unit and integration tests | 105 passing |
 
-**Bugs the evaluation found** (1–3 fixed, each with a regression test; 4 is planned):
+**Bugs the evaluation found** (all fixed, each with a regression test):
 1. Hindi "लाख" amounts were misread, causing false conflict alarms.
 2. Devanagari survey numbers were erased during comparison.
 3. OCR's comma-as-dot "5.50,000" was read as ₹5.5.
-4. The Supreme Court loader would have skipped 242 of 245 judgments from 2026 (not yet fixed: step 1 of
-   the ingestion plan).
+4. The Supreme Court loader would have skipped 242 of 245 judgments from 2026 (fixed in the new ingester
+   and the old loader).
 
 **Not yet measured** (needs an API key): LLM extraction, explanations, fused case facts, chat answers, and
 the safety red-team. Retrieval recall@10 needs the corpus and labelled questions.

@@ -103,8 +103,11 @@ def _candidate_block(db: Session, cand: Candidate) -> str:
         )
     ).all()
     matched = "\n".join(f"[¶{p.para_no}] {p.text[:700]}" for p in paras)
-    # Only the summary fields the analysis needs, to keep the prompt (and the wait) short.
+    # Only the summary fields the analysis needs, to keep the prompt (and the wait) short. Judgments
+    # ingested without a summary yet (summaries are written on first open) use their headnote instead.
     summary = {k: j.summary.get(k) for k in ("facts", "issues", "holding", "outcome") if j.summary and j.summary.get(k)}
+    if not summary and j.headnote:
+        summary = {"headnote": j.headnote[:1500]}
     return (
         f'<judgment judgment_id="{j.id}">\n'
         f"Title: {j.title}\nCourt: {j.court}\nDate: {j.decision_date}\nDisposal: {j.disposal}\n"

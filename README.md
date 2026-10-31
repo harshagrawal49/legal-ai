@@ -67,9 +67,11 @@ cd backend
 cp .env.example .env          # add LLM_API_KEY
 uv sync
 
-# 3. Load some judgments (start small; each one costs one bulk-model call)
-uv run python -m ingest.supreme_court --year 2023 --limit 30
-uv run python -m ingest.supreme_court --year 2022 --limit 30 --match "developers" "buildwell" "infratech"
+# 3. Load property / land dispute judgments (Supreme Court + High Courts), one command.
+#    Incremental and safe to re-run or interrupt; no LLM calls at ingestion.
+uv run python -m ingest --dry-run --limit 50   # preview, no database needed
+uv run python -m ingest --source sc --years 2015-2026   # a good first load
+uv run python -m ingest                         # everything in scope (long first run; then weekly updates)
 
 # 4. Start the API  (docs at http://localhost:8000/docs)
 uv run uvicorn app.main:app --reload

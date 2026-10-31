@@ -33,6 +33,7 @@ app.include_router(cases.router)
 app.include_router(documents.router)
 app.include_router(documents.library)
 app.include_router(judgments.router)
+app.include_router(judgments.corpus)
 
 
 @app.exception_handler(LLMRefusal)

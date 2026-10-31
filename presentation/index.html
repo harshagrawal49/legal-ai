@@ -665,7 +665,7 @@ svg text { font-family: var(--font); }
       <div style="width:320px;background:#4ade80">Full-text scoring + exclusions</div>
       <div style="width:210px;background:#ffb347">Property & land only</div>
     </div>
-    <p class="grow r" style="--d:.8s">Designed so the legal memory holds <b>only property and land disputes</b>, filtered in stages, and <b>updates itself</b> weekly as courts publish new judgments. <span class="tag t-saffron" style="font-size:14px">designed · being built</span></p>
+    <p class="grow r" style="--d:.8s">The legal memory holds <b>only property and land disputes</b>, filtered in stages, and <b>updates itself</b> with one command, run weekly. In a trial on 2024: 154 of 782 Supreme Court judgments kept.</p>
   </div>
   <aside class="notes">Hybrid retrieval: full-text search catches exact legal terms; embeddings catch meaning; the two ranked lists are merged with Reciprocal Rank Fusion; then the model explains relevance (supports / opposes / mixed), restricted to the retrieved candidates. Corpus: public Supreme Court and High Court judgment datasets, filtered to property disputes in stages (metadata, full text, semantic check), with incremental weekly updates.</aside>
 </section>
@@ -733,7 +733,7 @@ svg text { font-family: var(--font); }
 
 <!-- ===================================================== 23. FRESH -->
 <section class="slide" data-chapter="Act 4 · Keeping current">
-  <div class="kicker r">The law keeps moving · <span class="tag t-saffron" style="font-size:13px; letter-spacing:.05em">designed · being built</span></div>
+  <div class="kicker r">The law keeps moving</div>
   <h2 class="r" style="--d:.1s">A legal memory that keeps itself up to date.</h2>
   <div class="tl">
     <div class="pt" style="left:3%;--d:.3s">✓</div><div class="lab" style="left:3%">initial load</div>
@@ -748,7 +748,7 @@ svg text { font-family: var(--font); }
     <div class="card r" style="--d:.7s"><h3>Filter</h3><p>Only property and land disputes pass: case type, acts cited, headnotes, full text, then a semantic check.</p></div>
     <div class="card r" style="--d:.9s"><h3>Learn</h3><p>New judgments become searchable; summaries are written only when first needed, keeping costs near zero.</p></div>
   </div>
-  <aside class="notes">This is designed and partly in progress. Be clear about status on the day. Real-data checks already uncovered a bug that would have skipped 242 of 245 new 2026 Supreme Court judgments, because the dataset's language field is empty. The fix, checking the actual file rather than the flag, is the first implementation step.</aside>
+  <aside class="notes">Implemented: one command (python -m ingest) detects changed dataset partitions by ETag, filters in four stages and stores only property judgments, with no LLM call at ingestion. Dry runs on live data: SC 2024, 154 of 782 kept; Bombay HC at Goa 2025, 16 of 1,466. Real-data checks found that SC metadata has no headnote before 2024, so those judgments are judged on full text. Filter precision still has to be hand-labelled.</aside>
 </section>
 
 <!-- ===================================================== 24. CHAPTER: PROOF -->
@@ -829,9 +829,9 @@ svg text { font-family: var(--font); }
     <div class="card r" style="--d:.3s"><h3><span class="deva">रुपये 5 लाख</span> read as ₹5</h3><p>The Hindi word for lakh wasn't understood, causing false "amount conflict" alarms (precision 96%). Fixed → 100%.</p></div>
     <div class="card r" style="--d:.5s"><h3>Survey no. <span class="deva">१२३/४</span> vanished</h3><p>Devanagari identifiers were erased during comparison, so real differences went unnoticed. Fixed and tested.</p></div>
     <div class="card r" style="--d:.7s"><h3>"5,50,000" became "5.50,000"</h3><p>OCR read a comma as a dot, turning ₹5.5 lakh into ₹5.5. The parser now understands this OCR slip.</p></div>
-    <div class="card r" style="--d:.9s"><h3>242 of 245 judgments skipped</h3><p>The court dataset's language field was empty for new 2026 judgments. Found by checking the live data; the fix (check the file, not the flag) is the first step of the ingestion plan.</p></div>
+    <div class="card r" style="--d:.9s"><h3>242 of 245 judgments skipped</h3><p>The court dataset's language field was empty for new 2026 judgments. Our ingester now checks the actual file, not the flag.</p></div>
   </div>
-  <aside class="notes">This slide shows engineering maturity: measurement finds real problems. The first three are fixed with regression tests; the fourth was found while designing the ingestion pipeline and its fix is the first step of that plan.</aside>
+  <aside class="notes">This slide shows engineering maturity: measurement finds real problems. All four are fixed, each with a regression test.</aside>
 </section>
 
 <!-- ===================================================== 30. LIMITS -->

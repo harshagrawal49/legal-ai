@@ -8,7 +8,7 @@ import uuid
 from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Computed, Date, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import Computed, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,9 +33,29 @@ class Judgment(Base):
     disposal: Mapped[str | None] = mapped_column(String)
     source_url: Mapped[str] = mapped_column(Text)
 
-    # Structured summary produced once at ingestion (see app/llm/schemas.py: JudgmentSummary).
+    # Structured summary (app/llm/schemas.py: JudgmentSummary). Written lazily, the first time the
+    # judgment is opened, so ingestion needs no LLM call; empty until then (summary_status = "none").
     summary: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Embedding of the headnote / opening text (or the summary), used by the summary-level search list.
     summary_embedding = mapped_column(Vector(EMBED_DIM))
+
+    # Provenance and filtering (ingest/): where it came from and why it was judged a property dispute.
+    source: Mapped[str | None] = mapped_column(String)  # sc | hc
+    court_code: Mapped[str | None] = mapped_column(String)  # HC, e.g. 27_1
+    bench: Mapped[str | None] = mapped_column(String)  # HC, e.g. hcbgoa
+    cnr: Mapped[str | None] = mapped_column(String, index=True)
+    case_type: Mapped[str | None] = mapped_column(String)  # e.g. SA, FA, CA
+    headnote: Mapped[str | None] = mapped_column(Text)  # SC headnote / HC opening lines from the dataset
+    acts: Mapped[list] = mapped_column(JSONB, default=list)  # [{"act": ..., "section": ...}]
+    topic_tags: Mapped[list] = mapped_column(JSONB, default=list)  # e.g. ["sale_contract"]
+    property_score: Mapped[float | None] = mapped_column(Float)
+    filter_evidence: Mapped[dict] = mapped_column(JSONB, default=dict)
+    language: Mapped[str | None] = mapped_column(String)
+    pdf_key: Mapped[str | None] = mapped_column(Text)
+    summary_status: Mapped[str] = mapped_column(String, default="none")  # none | done
+    embedding_model: Mapped[str | None] = mapped_column(String)
+    pipeline_version: Mapped[str | None] = mapped_column(String)
+    ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     paragraphs: Mapped[list["JudgmentParagraph"]] = relationship(
         back_populates="judgment", order_by="JudgmentParagraph.para_no", cascade="all, delete-orphan"
@@ -149,3 +169,54 @@ class ChatMessage(Base):
     sources: Mapped[list] = mapped_column(JSONB, default=list)
     mentions: Mapped[list] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---------- Ingestion bookkeeping (ingest/) ----------
+
+
+class IngestionItem(Base):
+    """Every source record the ingester has seen, with its outcome: the queue for retries and the audit trail.
+
+    status: rejected (filtered out, reasons kept) | accepted (stored as a Judgment) | failed (will be retried)
+    """
+
+    __tablename__ = "ingestion_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String)  # sc | hc
+    key: Mapped[str] = mapped_column(String)  # the Judgment id it becomes
+    partition: Mapped[str] = mapped_column(String)  # "2024" or "2025/27_1/hcbgoa"
+    status: Mapped[str] = mapped_column(String)
+    stage: Mapped[str | None] = mapped_column(String)  # metadata | fulltext | semantic | llm
+    score: Mapped[float | None] = mapped_column(Float)
+    reasons: Mapped[list] = mapped_column(JSONB, default=list)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    pipeline_version: Mapped[str | None] = mapped_column(String)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (UniqueConstraint("source", "key", name="uq_ingestion_items_source_key"),)
+
+
+class IngestionRun(Base):
+    __tablename__ = "ingestion_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    args: Mapped[dict] = mapped_column(JSONB, default=dict)
+    stats: Mapped[dict] = mapped_column(JSONB, default=dict)  # partitions, seen, new, accepted, rejected, failed, llm_calls
+    status: Mapped[str] = mapped_column(String, default="running")  # running | done | interrupted | error
+
+
+class SourcePartition(Base):
+    """Watermark per source partition: if the metadata file's ETag hasn't changed, there is nothing new."""
+
+    __tablename__ = "source_partitions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # "sc/2024", "hc/2025/27_1/hcbgoa"
+    etag: Mapped[str | None] = mapped_column(String)
+    last_modified: Mapped[str | None] = mapped_column(String)
+    rows: Mapped[int | None] = mapped_column(Integer)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

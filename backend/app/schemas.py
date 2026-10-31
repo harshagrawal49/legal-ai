@@ -38,6 +38,8 @@ class JudgmentBrief(BaseModel):
     disposal: str | None
     source_url: str
     summary: dict
+    headnote: str | None = None  # dataset headnote / opening lines (shown until a summary exists)
+    topic_tags: list[str] | None = None  # property-dispute topics from ingestion, e.g. ["sale_contract"]
 
 
 class CaseResultOut(BaseModel):

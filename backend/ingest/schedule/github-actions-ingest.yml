@@ -1,0 +1,26 @@
+# Weekly judgment ingestion on GitHub Actions (template; not active until copied).
+#   1. Copy to .github/workflows/ingest.yml
+#   2. Add repository secret DATABASE_URL pointing to a hosted Postgres with pgvector
+#      (e.g. Supabase: postgresql+psycopg://user:password@host:5432/postgres)
+#   3. Optional secret LLM_API_KEY enables the capped LLM check for borderline judgments.
+# Check your plan's limits on Actions minutes and database size before enabling.
+name: ingest-judgments
+on:
+  schedule:
+    - cron: "0 21 * * 6"   # Saturdays 21:00 UTC (Sunday 02:30 IST)
+  workflow_dispatch: {}
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-hin
+      - run: uv sync
+      - name: Ingest new property judgments (incremental)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: uv run python -m ingest -q

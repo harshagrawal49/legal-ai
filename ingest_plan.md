@@ -2,7 +2,9 @@
 
 > Goal: a searchable corpus of **all property and land dispute judgments** from the Supreme Court
 > of India and the High Courts, **kept up to date automatically** as new judgments are published.
-> Status: plan. Facts marked ✅ were checked against the live datasets on 2026-10-31.
+> Status: **implemented** (2026-11-01). One command: `cd backend && uv run python -m ingest`.
+> Facts marked ✅ were checked against the live datasets on 2026-10-31. Implementation notes and the
+> real-data findings that changed the design are in §13.
 
 ---
 
@@ -353,3 +355,67 @@ positives: Limitation s.5, NDPS "possession"), as done for the rest of the proje
 | Free-tier LLM limits | No LLM at ingestion except a capped Stage 4; lazy summaries |
 | Hindi retrieval is weak with English embeddings | Measure first; switch to a multilingual model only with evidence |
 | Overruled precedents shown as good law | Phase-2 citation graph; show appeal links |
+
+
+## 13. Implementation (2026-11-01)
+
+### One command
+
+```bash
+cd backend
+docker compose up -d                          # from the repo root, once: Postgres + pgvector
+uv run python -m ingest                       # everything in scope, incremental; safe to re-run or Ctrl-C
+uv run python -m ingest --dry-run --limit 50  # see what would be ingested, no database needed
+uv run python -m ingest --stats               # what the corpus holds
+```
+
+Useful options: `--source sc|hc`, `--years 2015-2026`, `--hc-years 2024`, `--courts 27_1`, `--limit N`,
+`--full` (re-scan unchanged partitions), `--reprocess` (re-judge after changing rules),
+`--llm-budget N`, `--workers N`, `--sample-csv decisions.csv` (for labelling).
+
+Default scope: SC all years; HC Bombay `27_1` plus `2_5`, `9_13`, `23_23`, 2018–now.
+
+### What was built
+
+| Plan item | Where | Notes |
+|---|---|---|
+| Sources (SC, HC, case details, ETags) | `ingest/sources.py` | Plain HTTPS, paginated listing, disk cache; ignores the unreliable `available_languages` / `pdf_exists` flags |
+| Stage 1 + 2 filters, taxonomy, exclusions | `ingest/filters.py` | Pure functions with reasons; known false positives are unit-tested |
+| Stage 3 seeds + similarity | `ingest/semantic.py`, `ingest/seeds.json` | 16 positive / 12 negative **hand-written descriptions** rather than real judgments (easy to curate; replace once a labelled sample exists) |
+| Stage 4 LLM check | `ingest/semantic.py` | Only for still-borderline cases; budget 50/run if an API key is set, else 0 |
+| Pipeline: incremental, idempotent, retries | `ingest/pipeline.py` | ETag watermark per partition; decided items never re-downloaded; failures retried up to 3 times; Ctrl-C safe |
+| Data model | `app/models.py`, `app/db.py` | New judgment columns + `ingestion_items`, `ingestion_runs`, `source_partitions`. **Deviation:** kept additive `ADD COLUMN IF NOT EXISTS` instead of Alembic (no new dependency yet) |
+| No LLM at ingestion; lazy summaries | `app/api/judgments.py`, `app/services/search.py` | Summary written on first open; search uses the headnote meanwhile |
+| Corpus stats | `GET /corpus/stats`, `--stats` | |
+| Scheduling | `ingest/schedule/` | launchd plist and GitHub Actions template (not active until copied) |
+| Filter evaluation | `ingest/evaluate.py` | Precision/recall with 95% CIs from a hand-labelled `--sample-csv` |
+| Old SC loader bug | `ingest/supreme_court.py` | Language-flag filter removed |
+
+### Real-data findings that changed the design (dry runs on live data)
+
+1. **SC metadata has no headnote before 2024** (0% for every year sampled from 1955 to 2022; 21% in
+   2024). Stage 1 on titles alone rejected almost everything. → SC records without a headnote go to
+   full-text judging, so most SC PDFs are downloaded once (several hours for all years; resumable).
+2. Stage 1 was too strict: 8 clearly in-scope SC 2024 cases were missed (land ceiling, consolidation,
+   allotment, gift, "the present acquisition"). → Weak "property noun" and second-appeal signals; Stage 1
+   now favours recall. 7 of the 8 were then accepted.
+3. False positives found and fixed: "*Societies* Registration Act" counted as the Registration Act;
+   semantic accepts on thin margins (0.65 vs 0.62); money-laundering and SEBI cases kept by the
+   tie-break. → Statute regex fixed, margin 0.05, semantic accept needs a full-text score ≥ 5.5,
+   exclusions added, and the tie-break never keeps excluded cases.
+4. The HC dataset includes short procedural orders (Lok Adalat sittings, one-paragraph orders); these
+   score ~0 and are rejected, which is intended.
+5. Only a fraction of HC rows have case details with acts (50 of 1,466 Goa 2025 orders), so HC filtering
+   relies mostly on case-type codes and full text.
+
+### Dry-run results (not yet hand-labelled)
+
+| Partition | Records | Downloaded | Accepted | Notes |
+|---|---|---|---|---|
+| SC 2024 | 782 | 651 | **154 (19.7%)** | Topics: title 62, land records 55, possession 54, sale 37, tenancy 32, acquisition 30… |
+| HC Bombay at Goa 2025 | 1,466 | 109 | **16 (1.1%)** | Mostly second appeals (SA) and appeals from orders (AO) |
+
+A spot-check of 30 accepted SC titles found about 4–6 doubtful ones, which led to fix 3 above. **Filter
+precision and recall are not yet measured**: label a `--sample-csv` and run `python -m ingest.evaluate`.
+Postgres storage could not be run on the development machine (no database there); the DDL was
+validated and the full pipeline was tested with an in-memory store.

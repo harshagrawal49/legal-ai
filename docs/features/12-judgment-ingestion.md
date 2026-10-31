@@ -5,7 +5,14 @@ It builds the legal memory that search ([08](08-legal-search.md)) and chat use: 
 split into numbered paragraphs, summarised, and embedded. The target scope is **all property and land
 dispute judgments from the Supreme Court and High Courts, kept up to date automatically**.
 
-## How it is implemented today (Supreme Court)
+## One command
+
+```bash
+cd backend && uv run python -m ingest            # incremental; --dry-run needs no database
+```
+Details, options and real-data findings: [`../../ingest_plan.md`](../../ingest_plan.md) §13.
+
+## How it was first implemented (older Supreme Court loader, still available)
 1. **Source:** the public *Indian Supreme Court Judgments* dataset on AWS Open Data (metadata as yearly
    Parquet files, plus PDFs), read over HTTPS with a local download cache.
 2. **Selection:** by year, with an optional keyword match on title and description, and a limit per run.
@@ -18,7 +25,7 @@ dispute judgments from the Supreme Court and High Courts, kept up to date automa
    pgvector, with a GIN full-text index on paragraphs.
 6. **Re-runs are safe:** judgments already ingested are skipped.
 
-## Planned: property-only, Supreme Court + High Courts, self-updating
+## Now implemented: property-only, Supreme Court + High Courts, self-updating
 Full design: [`../../ingest_plan.md`](../../ingest_plan.md). Key points, checked against the live datasets:
 - **Both datasets are public and updated regularly.** They cover 1950–2026; the 2026 Supreme Court file
   was last modified on 2026-10-17. The High Court dataset is organised by year → court → bench across 25
@@ -51,11 +58,14 @@ Full design: [`../../ingest_plan.md`](../../ingest_plan.md). Key points, checked
 | Fixed-size chunks only | Lose the judgment's own paragraph numbers, so citations like ¶12 wouldn't match the original |
 | Summarising every judgment at ingestion | Thousands of LLM calls; not feasible on a free tier, and most judgments are never retrieved |
 
-## Results
-- **Bug found by checking the live data:** the current loader keeps only rows whose language field says
-  "ENG". For 2026 that field is empty for **242 of 245** judgments, yet the English PDFs exist. The fix
-  (check the file, not the flag) is step 1 of the plan.
-- A sample of filter selectivity: about 5–10% of judgments are property disputes (Supreme Court 2024:
-  5.6% by keywords; a High Court bench: 4.8% by acts, before exclusions).
-- **Filter precision/recall and retrieval recall@10 are not yet measured**; the plan includes a
-  300-judgment labelled sample and ~30 labelled questions.
+## Results (dry runs on live data)
+- **Supreme Court 2024:** 782 judgments → 651 downloaded → **154 accepted (19.7%)**.
+- **Bombay High Court at Goa, 2025:** 1,466 orders → 109 downloaded → **16 accepted**, mostly second
+  appeals and appeals from orders.
+- **Fixed:** the old loader skipped rows whose language flag was empty, which in 2026 was **242 of 245**
+  judgments even though their PDFs exist.
+- **Finding:** Supreme Court metadata has **no headnote before 2024**, so those judgments are judged on
+  full text.
+- Several false positives found in the dry runs were fixed (see `ingest_plan.md` §13).
+- **Filter precision/recall is not yet measured.** Tooling is ready: `--sample-csv` plus
+  `python -m ingest.evaluate`. Retrieval recall@10 also needs a labelled question set.
