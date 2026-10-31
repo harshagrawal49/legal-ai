@@ -38,6 +38,8 @@ import com.nyaya.legal.data.Understanding
 import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.Loading
 import com.nyaya.legal.ui.text
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -61,6 +63,8 @@ class DocumentViewModel(private val caseId: String, private val docId: String) :
     var explainError by mutableStateOf<String?>(null)
         private set
 
+    private var explainJob: Job? = null
+
     init {
         viewModelScope.launch {
             runCatching { Api.service.document(caseId, docId) }
@@ -77,12 +81,15 @@ class DocumentViewModel(private val caseId: String, private val docId: String) :
         language = lang
         explaining = true
         explainError = null
-        viewModelScope.launch {
-            runCatching {
+        explainJob?.cancel() // a slower answer for the previous language must not overwrite this one
+        explainJob = viewModelScope.launch {
+            val result = runCatching {
                 if (regenerate) Api.service.regenerateUnderstanding(caseId, docId, lang)
                 else Api.service.understanding(caseId, docId, lang)
-            }.onSuccess { understanding = it }
-                .onFailure { explainError = Api.errorMessage(it) }
+            }
+            // runCatching also catches the cancellation: a replaced request must change nothing.
+            if (!isActive) return@launch
+            result.onSuccess { understanding = it }.onFailure { explainError = Api.errorMessage(it) }
             explaining = false
         }
     }

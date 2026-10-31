@@ -65,10 +65,6 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
-    init {
-        existingCaseId?.let { id -> run("Loading…") { case = Api.service.getCase(id) } }
-    }
-
     /** PDFs picked on the first step, before the case exists: (uri, file name). Uploaded after creation. */
     val pendingFiles = mutableStateListOf<Pair<Uri, String>>()
 
@@ -115,6 +111,11 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
     fun search(onDone: (String) -> Unit) = run("Searching court judgments…") {
         Api.service.search(case!!.id)
         onDone(case!!.id)
+    }
+
+    // After all properties, so nothing launched here can see an uninitialised one.
+    init {
+        existingCaseId?.let { id -> run("Loading…") { case = Api.service.getCase(id) } }
     }
 
     private fun run(message: String, block: suspend () -> Unit) = viewModelScope.launch {

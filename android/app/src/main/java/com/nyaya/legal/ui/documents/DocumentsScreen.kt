@@ -55,7 +55,10 @@ import com.nyaya.legal.data.TimelineItem
 import com.nyaya.legal.data.uploadDocument
 import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.Loading
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.remember
 import kotlinx.coroutines.Job
+import retrofit2.HttpException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -69,18 +72,20 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    private var polling: Job? = null
+
     init {
         refresh()
     }
 
-    private var polling: Job? = null
-
-    fun refresh() {
+    /** `clearError = false` after an action, so the action's own error stays visible. */
+    fun refresh(clearError: Boolean = true) {
         viewModelScope.launch {
             runCatching {
                 documents = Api.service.documents(caseId)
                 evidence = Api.service.evidence(caseId)
-            }.onFailure { error = Api.errorMessage(it) }
+            }.onSuccess { if (clearError) error = null }
+                .onFailure { error = Api.errorMessage(it) }
             pollWhileProcessing()
         }
     }
@@ -103,7 +108,7 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
         viewModelScope.launch {
             runCatching { block() }.onFailure { error = Api.errorMessage(it) }
             busy = null
-            refresh()
+            refresh(clearError = false)
         }
     }
 
@@ -113,7 +118,10 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
 
     fun retry(docId: String) = run("Extracting facts again…") { Api.service.retryExtraction(caseId, docId) }
 
-    fun delete(docId: String) = run("Deleting…") { Api.service.deleteDocument(caseId, docId) }
+    fun delete(docId: String) = run("Deleting…") {
+        val response = Api.service.deleteDocument(caseId, docId)
+        if (!response.isSuccessful) throw HttpException(response) // Response<Unit> doesn't throw by itself
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,6 +181,16 @@ private fun DocumentList(
     onRetry: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
+    var confirmDelete by remember { mutableStateOf<DocumentSummary?>(null) }
+    confirmDelete?.let { doc ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("Delete ${doc.filename}?") },
+            text = { Text("Its text, extracted facts and explanation are deleted. This can't be undone.") },
+            confirmButton = { TextButton(onClick = { onDelete(doc.id); confirmDelete = null }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
+        )
+    }
     if (docs.isEmpty()) {
         Text(
             "No documents yet. Upload an agreement to sell, a receipt, a notice or a land record (PDF or photo). " +
@@ -202,7 +220,7 @@ private fun DocumentList(
                         doc.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         if (doc.status == "text_only") TextButton(onClick = { onRetry(doc.id) }) { Text("Try extraction again") }
                     }
-                    IconButton(onClick = { onDelete(doc.id) }) { Icon(Icons.Default.Delete, "Delete document") }
+                    IconButton(onClick = { confirmDelete = doc }) { Icon(Icons.Default.Delete, "Delete document") }
                 }
             }
         }

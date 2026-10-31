@@ -101,7 +101,8 @@ fun ResultsScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(results, key = { it.judgment.id }) { ResultCard(it, onClick = { onOpenJudgment(it.judgment.id) }) }
+                    items(results, key = { it.rank }) { // rank is unique per case; judgment ids may repeat in old results
+                         ResultCard(it, onClick = { onOpenJudgment(it.judgment.id) }) }
                 }
             }
         }

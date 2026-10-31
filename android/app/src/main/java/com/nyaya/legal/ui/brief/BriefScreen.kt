@@ -144,7 +144,7 @@ private fun BriefContent(brief: Brief, onOpenDocument: (String, Int?) -> Unit, o
 
         item { SectionTitle("7. Potentially relevant judgments") }
         if (brief.legalSources.isEmpty()) item { Text("No similar-case search has been run for this case yet.") }
-        items(brief.legalSources, key = { it.judgmentId }) { s ->
+        items(brief.legalSources) { s ->
             Card(Modifier.fillMaxWidth().clickable { onOpenJudgment(s.judgmentId) }) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(s.title, style = MaterialTheme.typography.titleSmall)

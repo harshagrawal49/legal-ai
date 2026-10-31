@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -129,6 +130,14 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
         }
     }
 
+    /** The case's documents, for @ suggestions. */
+    var documents by mutableStateOf<List<DocumentSummary>>(emptyList())
+        private set
+
+    /** History loaded. Sending is disabled until then, so a new message can't land above the history. */
+    var loaded by mutableStateOf(false)
+        private set
+
     init {
         viewModelScope.launch {
             runCatching {
@@ -138,13 +147,10 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
                 titles = Api.service.results(caseId).associate { it.judgment.id to it.judgment.title }
                 documents = Api.service.documents(caseId)
                 filenames = documents.associate { it.id to it.filename }
-            }.onFailure { error = "Could not load the conversation: ${it.message}" }
+            }.onFailure { error = "Could not load the conversation: ${Api.errorMessage(it)}" }
+            loaded = true
         }
     }
-
-    /** The case's documents, for @ suggestions. */
-    var documents by mutableStateOf<List<DocumentSummary>>(emptyList())
-        private set
 
     /** Documents offered for the "@…" the user is typing at the end of the input. */
     fun mentionSuggestions(input: String): List<DocumentSummary> {
@@ -157,6 +163,8 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
 
     fun send(text: String) {
         messages.add(UiMessage(fromUser = true, text = text))
+        // The reply's own position: notices (e.g. a finished upload) may be added after it while it streams.
+        val reply = messages.size
         messages.add(UiMessage(fromUser = false, text = ""))
         streaming = true
         error = null
@@ -164,8 +172,7 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
             Api.chat(caseId, text, mentionsIn(text)).collect { event ->
                 when (event) {
                     is ChatEvent.Text -> {
-                        val last = messages.last()
-                        messages[messages.lastIndex] = last.copy(text = last.text + event.delta)
+                        messages[reply] = messages[reply].copy(text = messages[reply].text + event.delta)
                         status = null
                     }
                     is ChatEvent.Tool -> status = when (event.name) {
@@ -177,14 +184,16 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
                     is ChatEvent.Done -> {
                         status = null
                         unverified = unverified + event.unverified
-                        val last = messages.last()
-                        messages[messages.lastIndex] = last.copy(sources = event.sources)
+                        messages[reply] = messages[reply].copy(sources = event.sources)
                         if (event.uncitedMentions.isNotEmpty()) {
                             val names = event.uncitedMentions.mapNotNull { filenames[it] }.joinToString()
                             messages.add(UiMessage(fromUser = false, text = "The answer didn't cite $names. Ask again if you expected it to.", notice = true))
                         }
                     }
-                    is ChatEvent.Error -> error = event.message
+                    is ChatEvent.Error -> {
+                        error = event.message
+                        if (messages[reply].text.isBlank()) messages.removeAt(reply) // no empty bubble
+                    }
                 }
             }
             streaming = false
@@ -232,7 +241,7 @@ fun ChatScreen(
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             Disclaimer()
             LazyColumn(
                 Modifier.weight(1f),
@@ -262,7 +271,7 @@ fun ChatScreen(
                         suggestions.forEach { doc ->
                             Text(
                                 "@${doc.filename}" + (doc.documentType?.let { " · ${it.replace('_', ' ')}" } ?: ""),
-                                modifier = Modifier.fillMaxWidth().clickable { input = input.replace(MENTION_QUERY, "@${doc.filename} ") }
+                                modifier = Modifier.fillMaxWidth().clickable { input = input.replace(MENTION_QUERY, Regex.escapeReplacement("@${doc.filename} ")) }
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                             )
                         }
@@ -284,7 +293,7 @@ fun ChatScreen(
                 )
                 IconButton(
                     onClick = { vm.send(input.trim()); input = "" },
-                    enabled = input.isNotBlank() && !vm.streaming,
+                    enabled = input.isNotBlank() && !vm.streaming && vm.loaded,
                 ) { Icon(Icons.AutoMirrored.Filled.Send, "Send") }
             }
         }

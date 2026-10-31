@@ -134,11 +134,17 @@ def find_similar_cases(db: Session, case: Case) -> list[CaseResult]:
 
     # Keep only IDs we actually sent (guards against invented citations), best first.
     valid_ids = {c.judgment_id for c in candidates}
-    matches = sorted(
+    ranked = sorted(
         (m for m in analysis.matches if m.judgment_id in valid_ids and m.relevance >= 30),
         key=lambda m: m.relevance,
         reverse=True,
-    )[: settings.search_results]
+    )
+    # One result per judgment: the model sometimes lists the same judgment twice, and the app keys
+    # its lists by judgment id (a duplicate would crash them).
+    best: dict[str, object] = {}
+    for m in ranked:
+        best.setdefault(m.judgment_id, m)
+    matches = list(best.values())[: settings.search_results]
 
     case.results = [
         CaseResult(

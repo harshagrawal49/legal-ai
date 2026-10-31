@@ -1,8 +1,10 @@
 package com.nyaya.legal.data
 
 import com.nyaya.legal.BuildConfig
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -139,7 +141,7 @@ object Api {
         val source = EventSources.createFactory(http.newBuilder().readTimeout(5, TimeUnit.MINUTES).build())
             .newEventSource(request, listener)
         awaitClose { source.cancel() }
-    }
+    }.buffer(Channel.UNLIMITED) // the default 64-event buffer drops events (even `done`) in a burst
 
     /** The backend's `detail` message for HTTP errors (e.g. "Only PDF files are supported."), else a generic one. */
     fun errorMessage(t: Throwable): String {
