@@ -56,6 +56,8 @@ import com.nyaya.legal.data.UPLOAD_MIMES
 import com.nyaya.legal.data.uploadDocument
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.nyaya.legal.ui.markdown.BulletText
+import com.nyaya.legal.ui.markdown.MarkdownText
 
 class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
     var case by mutableStateOf<CaseDetail?>(null)
@@ -230,7 +232,7 @@ private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: 
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("A few questions", style = MaterialTheme.typography.titleMedium)
-                    case.pendingQuestions.forEach { Text("• $it") }
+                    case.pendingQuestions.forEach { BulletText(it, style = MaterialTheme.typography.bodyLarge) }
                 }
             }
         }
@@ -271,14 +273,13 @@ private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: 
 fun FactSheetCard(fs: FactSheet, filenames: Map<String, String> = emptyMap()) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(fs.summary)
+            MarkdownText(fs.summary, style = MaterialTheme.typography.bodyLarge)
             if (fs.conflicts.isNotEmpty()) {
                 Text("Differences to check", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
                 fs.conflicts.forEach { c ->
-                    Text(
-                        "• ${c.description}: " + (c.userSays?.let { "you said $it; " } ?: "") +
+                    BulletText(
+                        "**${c.description}:** " + (c.userSays?.let { "you said $it; " } ?: "") +
                             "documents say ${c.documentsSay}" + sourcesText(c.sources, filenames),
-                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -313,7 +314,7 @@ private fun sourcesText(sources: List<String>, filenames: Map<String, String>): 
 private fun Section(title: String, lines: List<String>) {
     if (lines.isEmpty()) return
     Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
-    lines.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+    lines.forEach { BulletText(it) }
 }
 
 @Composable

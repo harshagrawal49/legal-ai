@@ -94,6 +94,10 @@ uv run python -c "from eval.samples import SAMPLES, make_pdf; [open(f'/tmp/{n}',
 `http://10.0.2.2:8000/`, which is your machine as seen from the emulator. From the command line,
 run `cd android && ./gradlew assembleDebug`.
 
+## How each feature works
+
+One document per feature (implementation, alternatives considered, measured results): [`docs/features/`](docs/features/README.md).
+
 ## Document understanding
 
 Every uploaded document (from the new-case screen, My documents or 📎 in chat) is listed in the case's

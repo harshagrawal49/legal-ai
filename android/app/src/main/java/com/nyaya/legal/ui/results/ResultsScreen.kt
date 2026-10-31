@@ -44,6 +44,7 @@ import com.nyaya.legal.ui.theme.MixedColor
 import com.nyaya.legal.ui.theme.OpposesColor
 import com.nyaya.legal.ui.theme.SupportsColor
 import kotlinx.coroutines.launch
+import com.nyaya.legal.ui.markdown.MarkdownText
 
 class ResultsViewModel(caseId: String) : ViewModel() {
     var results by mutableStateOf<List<CaseResult>?>(null)
@@ -124,7 +125,7 @@ private fun ResultCard(result: CaseResult, onClick: () -> Unit) {
                 Text("${result.relevance}% match", style = MaterialTheme.typography.labelLarge)
             }
             j.summary.text("outcome")?.let { Text("Outcome: $it", style = MaterialTheme.typography.bodyMedium) }
-            Text(result.explanation, style = MaterialTheme.typography.bodyMedium)
+            MarkdownText(result.explanation)
         }
     }
 }

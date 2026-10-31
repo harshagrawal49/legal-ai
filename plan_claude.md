@@ -407,6 +407,7 @@ project/
   rule-based classifier, plain-language explanations checked in code (pages, quotes, values, advice),
   cached per language; All my documents; chat `@` mentions and per-reply Sources. Scorecard
   (`eval/run_all.py`, 200 synthetic cases) and `docs/eval_report.md`. 102 tests pass.
+- **Mobile rendering of LLM text**: `ui/markdown/` renders chat replies as phone-friendly Markdown (hanging-indent bullets, headings, tables as one card per row, citation links kept inside bold/lists/cells); every hand-made "• " bullet in the app now uses `Bullet`/`BulletText`; page chips and language chips wrap (`FlowRow`). Prompts: `CHAT_FORMAT_RULES` (no tables, short paragraphs) on chat, `PLAIN_FIELD_RULES` on search analysis, document understanding and brief suggestions. Parser checked with a standalone kotlinc (19/20, the miss fixed afterwards); `MarkdownParserTest` added (JUnit). 107 backend tests pass. Compose UI not compiled yet.
 - **Remaining**: compile and test the Android build;  run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
   plus representative errors in `docs/evaluation.md`; add a retrieval eval with fixed questions.
 

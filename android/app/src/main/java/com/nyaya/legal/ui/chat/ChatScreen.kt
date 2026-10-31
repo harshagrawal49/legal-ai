@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -57,6 +58,7 @@ import com.nyaya.legal.data.UPLOAD_MIMES
 import com.nyaya.legal.data.uploadDocument
 import com.nyaya.legal.ui.Disclaimer
 import com.nyaya.legal.ui.ErrorText
+import com.nyaya.legal.ui.markdown.MarkdownText
 import com.nyaya.legal.ui.text
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.HorizontalDivider
@@ -202,7 +204,7 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) // consumeWindowInsets: opt-in is harmless if already stable
 @Composable
 fun ChatScreen(
     caseId: String,
@@ -281,7 +283,7 @@ fun ChatScreen(
                 Text("No documents in this case yet. Attach one with 📎.", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp))
             }
             Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { picker.launch(UPLOAD_MIMES) }, enabled = !vm.uploading && !vm.streaming) {
+                IconButton(onClick = { picker.launch(UPLOAD_MIMES) }, enabled = !vm.uploading && !vm.streaming && vm.loaded) {
                     Icon(Icons.Default.AttachFile, "Attach a PDF or photo")
                 }
                 OutlinedTextField(
@@ -325,7 +327,17 @@ private fun MessageBubble(
     }
     Card(colors = colors, modifier = Modifier.fillMaxWidth(if (msg.fromUser) 0.85f else 1f)) {
         Column(Modifier.padding(12.dp)) {
-            Text(if (msg.fromUser) withMentions(msg.text) else withCitationLinks(msg.text, titles, filenames, unverified, onOpenJudgment, onOpenDocument))
+            if (msg.fromUser) {
+                Text(withMentions(msg.text))
+            } else {
+                // Replies are Markdown (lists, bold, sometimes tables): render them for a phone, with
+                // citation markers turned into links wherever they appear.
+                MarkdownText(
+                    msg.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    plain = { appendCitations(it, titles, filenames, unverified, onOpenJudgment, onOpenDocument) },
+                )
+            }
             if (!msg.fromUser && msg.sources != null && msg.text.isNotBlank()) SourcesBlock(msg.sources, onOpenJudgment, onOpenDocument)
         }
     }
@@ -374,18 +386,18 @@ private fun withMentions(text: String) = buildAnnotatedString {
 private val CITATION = Regex("""\[\[(?:J:([^\]]+)|D:([0-9a-f-]+):p(\d+))]]""")
 
 /**
- * Turns [[J:<id>]] markers into tappable links to the judgment screen and [[D:<document id>:p<N>]]
- * markers into links to that page of the user's document. Citations the backend could not verify
- * are not linked.
+ * Appends [text], turning [[J:<id>]] markers into tappable links to the judgment screen and
+ * [[D:<document id>:p<N>]] markers into links to that page of the user's document. Citations the
+ * backend could not verify are not linked.
  */
-private fun withCitationLinks(
+private fun AnnotatedString.Builder.appendCitations(
     text: String,
     titles: Map<String, String>,
     filenames: Map<String, String>,
     unverified: Set<String>,
     onOpenJudgment: (String) -> Unit,
     onOpenDocument: (String, Int?) -> Unit,
-) = buildAnnotatedString {
+) {
     var last = 0
     for (match in CITATION.findAll(text)) {
         append(text.substring(last, match.range.first))

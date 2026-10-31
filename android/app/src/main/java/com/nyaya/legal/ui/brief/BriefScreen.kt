@@ -41,6 +41,10 @@ import com.nyaya.legal.ui.documents.SourceLink
 import com.nyaya.legal.ui.documents.TimelineRow
 import com.nyaya.legal.ui.documents.humanise
 import kotlinx.coroutines.launch
+import com.nyaya.legal.ui.markdown.BulletText
+import com.nyaya.legal.ui.markdown.MarkdownText
+import com.nyaya.legal.ui.markdown.markdownInline
+import androidx.compose.ui.text.font.FontWeight
 
 class BriefViewModel(private val caseId: String) : ViewModel() {
     var brief by mutableStateOf<Brief?>(null)
@@ -107,7 +111,8 @@ private fun BriefContent(brief: Brief, onOpenDocument: (String, Int?) -> Unit, o
             }
         }
 
-        section("1. Your summary", listOf(brief.userSummary ?: "No summary given yet."))
+        item { SectionTitle("1. Your summary") }
+        item { MarkdownText(brief.userSummary ?: "No summary given yet.") }
 
         item { SectionTitle("2. Documents processed") }
         items(brief.documents) { d ->
@@ -128,7 +133,7 @@ private fun BriefContent(brief: Brief, onOpenDocument: (String, Int?) -> Unit, o
         if (brief.supportedFacts.isEmpty()) item { Text("None yet. Upload documents to build this section.") }
         items(brief.supportedFacts) { f ->
             Column {
-                Text("${humanise(f.category)}: ${f.text}", style = MaterialTheme.typography.bodyMedium)
+                Text(markdownInline("**${humanise(f.category)}:** ${f.text}"), style = MaterialTheme.typography.bodyMedium)
                 SourceLink(f.source, onOpenDocument)
             }
         }
@@ -149,7 +154,8 @@ private fun BriefContent(brief: Brief, onOpenDocument: (String, Int?) -> Unit, o
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(s.title, style = MaterialTheme.typography.titleSmall)
                     Text(listOfNotNull(s.court, s.decisionDate, s.citation).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
-                    Text("Why it may matter: ${s.whyItMayMatter}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Why it may matter", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    MarkdownText(s.whyItMayMatter)
                     if (s.keyParagraphs.isNotEmpty()) {
                         Text("Key paragraphs: " + s.keyParagraphs.joinToString { "¶$it" }, style = MaterialTheme.typography.labelSmall)
                     }
@@ -158,12 +164,13 @@ private fun BriefContent(brief: Brief, onOpenDocument: (String, Int?) -> Unit, o
         }
 
         val note = if (brief.suggestionsAiGenerated) " (AI-suggested, review them)" else " (generated from the flags above)"
-        section("8. Questions to discuss with an advocate$note", brief.advocateQuestions.map { "• $it" })
-        section("9. Preparation checklist$note", brief.checklist.map { "☐ $it" })
+        section("8. Questions to discuss with an advocate$note", brief.advocateQuestions, marker = "•")
+        section("9. Preparation checklist$note", brief.checklist, marker = "☐")
     }
 }
 
-private fun LazyListScope.section(title: String, lines: List<String>) {
+/** A titled list. With a [marker], each line is a bullet with a hanging indent. */
+private fun LazyListScope.section(title: String, lines: List<String>, marker: String? = null) {
     item { SectionTitle(title) }
-    items(lines) { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    items(lines) { if (marker != null) BulletText(it, marker) else MarkdownText(it) }
 }
