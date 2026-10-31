@@ -6,8 +6,8 @@
 
 For each dataset x engine x quality level (eval/scans.py: clean, photo, degraded), every page is
 scanned synthetically, OCR'd, and compared with the original text. Datasets: `english` (the 3 sample
-documents, 4 pages) and `devanagari` (a Marathi receipt with Devanagari numerals and a Hindi
-agreement extract; needs a Devanagari font, which macOS ships). Metrics:
+documents, 4 pages) and `hindi` (a Hindi receipt with Devanagari numerals and a Hindi agreement
+extract; needs a Devanagari font, which macOS ships). Metrics:
 - CER / WER: character / word error rate (edit distance / reference length; lower is better);
 - key values: share of the names, survey numbers and amounts from eval/samples.py EXPECTED that
   survive OCR exactly, which matters most, because these feed the evidence flags;
@@ -74,14 +74,14 @@ def _english() -> list[tuple[str, list[str], bytes, list[str]]]:
     return out
 
 
-def _devanagari() -> list[tuple[str, list[str], bytes, list[str]]]:
+def _hindi() -> list[tuple[str, list[str], bytes, list[str]]]:
     if devanagari_font() is None:
-        print("skip devanagari set: no Devanagari font found (install Noto Sans Devanagari)")
+        print("skip hindi set: no Devanagari font found (install Noto Sans Devanagari)")
         return []
     return [(f, texts, make_devanagari_pdf(texts), DEVANAGARI_KEY_VALUES[f]) for f, texts in DEVANAGARI_SAMPLES.items()]
 
 
-DATASETS = {"english": _english, "devanagari": _devanagari}
+DATASETS = {"english": _english, "hindi": _hindi}
 
 
 def _squash(text: str) -> str:

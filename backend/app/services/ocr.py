@@ -4,9 +4,9 @@ Both run locally, so documents never leave the machine. OCR text is stored exact
 it: never "improved" by an LLM. A confidence score (0-100) is kept per page, so low-quality pages are
 flagged in the evidence pack instead of being silently trusted.
 
-    OCR_ENGINE=tesseract  brew install tesseract tesseract-lang   (OCR_LANGUAGES=eng+hin+mar)  (default)
+    OCR_ENGINE=tesseract  brew install tesseract tesseract-lang   (OCR_LANGUAGES=eng+hin)  (default)
     OCR_ENGINE=auto       Tesseract if installed, else PaddleOCR
-    OCR_ENGINE=paddle     uv sync --extra paddle                  (OCR_PADDLE_LANG=en | hi | mr)
+    OCR_ENGINE=paddle     uv sync --extra paddle                  (OCR_PADDLE_LANG=en | hi)
 
 eval/run_ocr_eval.py compares the installed engines on the same synthetic scans; docs/ocr_report.md
 explains why Tesseract is the default.
@@ -134,8 +134,8 @@ def _paddle_model(lang: str, variant: str):
     from paddleocr import PaddleOCR
 
     models = PADDLE_MOBILE_MODELS if variant == "mobile" else {}
-    if variant == "devanagari":  # PaddleOCR maps hi/mr to its Devanagari recognition model
-        lang = "mr"
+    if variant == "devanagari":  # PaddleOCR maps hi to its Devanagari recognition model
+        lang = "hi"
     try:  # 3.x: skip the document-unwarping models we don't need (much faster)
         return PaddleOCR(
             lang=None if models else lang, **models,

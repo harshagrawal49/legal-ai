@@ -149,6 +149,12 @@ Legend: 🎯 purpose · 🖼 visual · 🗣 talking points · 🔧 technical det
 - 🗣 A real example from testing: PaddleOCR read "Iyer" as "lyer" but got the survey number and amount exactly right. That's why OCR'd items are labelled and the conflict flags matter.
 - ⏱ 1:00
 
+**12c. One source of truth: documents + the user's account**
+- 🖼 Two inputs (user's story, documents) → fact sheet where every item has a source chip ("you said" / "receipt.pdf p.1" / "not confirmed") → conflicts in red ("you said ₹6 lakh; receipt says ₹5,50,000").
+- 🔧 Hybrid NLP: rule-based extractors (Indian amounts, dates, survey numbers in English/Hindi) cross-check the LLM; document refs from the LLM are verified against the page in code.
+- 📊 Rules found 20/20 values on text; on Tesseract OCR output 100% on clean/photo scans, 31–57% on degraded scans.
+- ⏱ 1:00
+
 **13. Pipeline 2: Evidence pack (deterministic, no AI)**
 - 🖼 Left: the 3 sample documents. Right: the flags they produce:
   - property identifier difference (123/4 vs 123/A)

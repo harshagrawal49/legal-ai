@@ -156,3 +156,9 @@ def test_devanagari_identifiers_are_compared_not_erased():
     assert _norm_id("सर्वे क्र. १२३/४") != _norm_id("सर्वे क्र. १२३/अ")
     assert _norm_id("१२३ / ४") == _norm_id("123/4")  # same number in either script
     assert parse_amount("रुपये ५,००,०००") == Decimal(500000)
+
+
+def test_hindi_marathi_lakh_and_crore():
+    # Found by eval/run_all.py: "रुपये 5 लाख" was parsed as Rs 5 and raised a false amount conflict.
+    assert parse_amount("रुपये 5 लाख") == parse_amount("रुपये 5,00,000") == Decimal(500000)
+    assert parse_amount("रुपये १.५ करोड़") == Decimal(15000000)

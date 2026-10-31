@@ -17,6 +17,7 @@ from app.llm.client import LLMRefusal, structured
 from app.llm.schemas import BriefSuggestions
 from app.models import Case, CaseDocument
 from app.services.evidence import build_flags, build_timeline, source_ref
+from app.services.intake import REF_RE
 
 log = logging.getLogger(__name__)
 
@@ -69,13 +70,20 @@ def _supported_facts(docs: list[CaseDocument]) -> list[dict]:
     return out
 
 
+def _only_user(item: dict) -> bool:
+    """Stated by the user and not backed by any document page (older fact sheets have no sources)."""
+    sources = item.get("sources") or ["user"]
+    return not any(s.startswith("D:") for s in sources)
+
+
 def _user_account(case: Case) -> list[str]:
+    """The user's statements that no uploaded document supports (allegations, in the brief's terms)."""
     fs = case.fact_sheet or {}
     lines = [
         f"{e['date']}: {e['description']}" if e.get("date") else e["description"]
-        for e in fs.get("events", [])
+        for e in fs.get("events", []) if _only_user(e)
     ]
-    lines += [f"{a['description']}: {a['value']}" for a in fs.get("amounts", [])]
+    lines += [f"{a['description']}: {a['value']}" for a in fs.get("amounts", []) if _only_user(a)]
     if fs.get("relief_sought"):
         lines.append(f"Relief sought: {fs['relief_sought']}")
     return lines
@@ -129,10 +137,29 @@ def _suggestions(case: Case, facts: list[dict], flags: list[dict]) -> tuple[Brie
         return _fallback_suggestions(flags), False
 
 
+def conflict_flags(case: Case) -> list[dict]:
+    """Where the user's account and the documents disagree (from the fact sheet), linked to the pages."""
+    by_id = {str(d.id): d for d in case.documents}
+    flags = []
+    for c in (case.fact_sheet or {}).get("conflicts", []):
+        refs = []
+        for ref in c.get("sources", []):
+            m = REF_RE.match(ref)
+            if m and m.group(1) in by_id:
+                refs.append(source_ref(by_id[m.group(1)], {"page": int(m.group(2))}))
+        said = f"You said: {c['user_says']}. " if c.get("user_says") else ""
+        flags.append({
+            "kind": "user_document_conflict",
+            "message": f"{c['description']}: {said}The documents say: {c['documents_say']}. Check which is correct.",
+            "sources": refs,
+        })
+    return flags
+
+
 def build_brief(case: Case) -> dict:
     docs = list(case.documents)
     facts = _supported_facts(docs)
-    flags = build_flags(docs)
+    flags = conflict_flags(case) + build_flags(docs)
     suggestions, ai_generated = _suggestions(case, facts, flags)
     return {
         "status": "draft",

@@ -77,6 +77,35 @@ def check_pdf_handling() -> list[dict]:
     return out
 
 
+# ---------- Rule-based NLP (deterministic) ----------
+
+
+def check_nlp() -> list[dict]:
+    """Recall of the rule-based extractors (app/services/nlp.py) on the expected amounts, dates and
+    property identifiers of the English and Hindi samples."""
+    from app.services import nlp
+    from app.services.evidence import _norm_id
+    from eval.scans import DEVANAGARI_SAMPLES
+
+    devanagari_expected = {
+        "rasid_hindi.pdf": {"amounts": ["५,००,०००"], "dates": ["2023-03-15"], "property_identifiers": ["१२३/४"]},
+        "anubandh_hindi.pdf": {"amounts": ["45,00,000", "5,00,000"], "dates": ["2023-03-15"], "property_identifiers": ["123/4"]},
+    }
+    cases = [(f, SAMPLES[f], EXPECTED[f]) for f in SAMPLES] + [(f, DEVANAGARI_SAMPLES[f], devanagari_expected[f]) for f in DEVANAGARI_SAMPLES]
+    out = []
+    for filename, pages, expected in cases:
+        found = {(m.kind, m.normalized) for m in nlp.extract(pages)}
+        wanted = (
+            [("amount", nlp.rupees(nlp.amount_value("Rs " + a))) for a in expected["amounts"]]
+            + [("date", d) for d in expected["dates"]]
+            + [("property_identifier", _norm_id(p)) for p in expected["property_identifiers"]]
+        )
+        missed = [w for w in wanted if w not in found]
+        out.append({"case": f"rule-based NLP: {filename}", "expected": f"{len(wanted)} values",
+                    "got": f"{len(wanted) - len(missed)} found" + (f", missed {missed}" if missed else ""), "ok": not missed})
+    return out
+
+
 # ---------- LLM extraction ----------
 
 
@@ -166,9 +195,10 @@ def main() -> int:
         "benchmark_version": BENCHMARK_VERSION,
         "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "pdf_handling": check_pdf_handling(),
+        "nlp": check_nlp(),
     }
     print(f"Benchmark v{BENCHMARK_VERSION}: {len(SAMPLES)} documents\n\nPDF handling:")
-    for c in report["pdf_handling"]:
+    for c in report["pdf_handling"] + report["nlp"]:
         print(f"  [{'ok' if c['ok'] else 'FAIL'}] {c['case']}: expected {c['expected']}, got {c['got']}")
 
     if args.llm:
@@ -201,7 +231,7 @@ def main() -> int:
     path = RESULTS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}.json"
     path.write_text(json.dumps(report, indent=2, ensure_ascii=False))
     print(f"\nSaved {path}")
-    return 0 if all(c["ok"] for c in report["pdf_handling"]) else 1
+    return 0 if all(c["ok"] for c in report["pdf_handling"] + report["nlp"]) else 1
 
 
 if __name__ == "__main__":

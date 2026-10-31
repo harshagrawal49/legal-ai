@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     # OCR for scanned pages and photos (app/services/ocr.py, docs/ocr_steps.md).
     ocr_enabled: bool = True
     ocr_engine: str = "tesseract"  # tesseract | paddle | auto (chosen by benchmark: docs/ocr_report.md)
-    ocr_languages: str = "eng+hin+mar"  # Tesseract language packs
-    ocr_paddle_lang: str = "en"  # PaddleOCR recognition language: en, or hi / mr for Devanagari
+    ocr_languages: str = "eng+hin"  # Tesseract language packs
+    ocr_paddle_lang: str = "en"  # PaddleOCR recognition language: en, or hi for Hindi
     ocr_paddle_model: str = "default"  # default (PP-OCRv6 medium) | mobile (PP-OCRv5 mobile, faster) | devanagari
     ocr_dpi: int = 300
     ocr_max_pages: int = 30

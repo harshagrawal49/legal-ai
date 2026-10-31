@@ -47,6 +47,8 @@ class CaseViewModel(private val caseId: String) : ViewModel() {
         private set
     var documentCount by mutableStateOf(0)
         private set
+    var filenames by mutableStateOf<Map<String, String>>(emptyMap())
+        private set
     var error by mutableStateOf<String?>(null)
         private set
 
@@ -54,7 +56,9 @@ class CaseViewModel(private val caseId: String) : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 case = Api.service.getCase(caseId)
-                documentCount = Api.service.documents(caseId).size
+                val docs = Api.service.documents(caseId)
+                documentCount = docs.size
+                filenames = docs.associate { it.id to it.filename }
             }.onSuccess { error = null }
                 .onFailure { error = Api.errorMessage(it) }
         }
@@ -111,7 +115,11 @@ fun CaseScreen(
                     Action(Icons.Default.Description, "Case-preparation brief", onBrief)
 
                     Text("Case summary", style = MaterialTheme.typography.titleMedium)
-                    FactSheetCard(case.factSheet)
+                    Text(
+                        "Built from your documents and what you told us. Each item shows its source.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    FactSheetCard(case.factSheet, vm.filenames)
                 }
             }
         }

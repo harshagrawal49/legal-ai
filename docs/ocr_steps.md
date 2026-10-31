@@ -40,13 +40,13 @@ Code map:
 
 macOS:
 ```bash
-brew install tesseract tesseract-lang     # tesseract-lang adds hin, mar and ~100 other languages
+brew install tesseract tesseract-lang     # tesseract-lang adds hin and ~100 other languages
 tesseract --version                       # expect 5.x
-tesseract --list-langs | grep -E "eng|hin|mar"
+tesseract --list-langs | grep -E "eng|hin"
 ```
 Ubuntu / Debian / Docker:
 ```bash
-sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-mar
+sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin
 ```
 The Python wrapper (`pytesseract`) is already a project dependency: `cd backend && uv sync`.
 
@@ -82,8 +82,8 @@ uv run python -c "from app.services import ocr; e = ocr.get_engine(); print(e.na
 | `OCR_ENGINE` | `tesseract` | Chosen by benchmark ([`ocr_report.md`](ocr_report.md)). `paddle` to use PaddleOCR; `auto` = Tesseract if installed, else PaddleOCR |
 | `OCR_PADDLE_MODEL` | `default` | PaddleOCR models: `default` (PP-OCRv6 medium), `mobile` (PP-OCRv5 mobile, faster), `devanagari` |
 | `OCR_RETRY_BELOW_CONFIDENCE` | `85` | Tesseract re-reads pages below this confidence with a denoise filter and keeps the better result |
-| `OCR_LANGUAGES` | `eng+hin+mar` | Tesseract languages. Each extra language slows OCR; all must be installed |
-| `OCR_PADDLE_LANG` | `en` | PaddleOCR uses **one** recognition language: `en`, or `hi` / `mr` for Devanagari documents |
+| `OCR_LANGUAGES` | `eng+hin` | Tesseract languages (documents are English or Hindi). Each extra language slows OCR; all must be installed |
+| `OCR_PADDLE_LANG` | `en` | PaddleOCR uses **one** recognition language: `en`, or `hi` for Hindi documents |
 | `OCR_DPI` | `300` | Render resolution. 300 is the usual balance; higher is slower and rarely better |
 | `OCR_MAX_PAGES` | `30` | Pages beyond this are skipped and flagged |
 | `OCR_MIN_CONFIDENCE` | `60` | Pages below this get an `ocr_low_confidence` flag |
@@ -135,7 +135,7 @@ JPEG/PNG and scanned-PDF uploads end to end.
 cd backend
 uv run python -m eval.run_ocr_eval                       # all installed engines, all 3 quality levels
 uv run python -m eval.run_ocr_eval --engines tesseract --qualities photo degraded
-uv run python -m eval.run_ocr_eval --sets devanagari --engines tesseract paddle-devanagari
+uv run python -m eval.run_ocr_eval --sets hindi --engines tesseract paddle-devanagari
 ```
 It prints a table and saves `eval/results/ocr-<timestamp>.json`:
 
@@ -158,7 +158,7 @@ The script ends with a recommendation: the engine with the lowest CER on the rea
 5. Re-run the benchmark after changing engines, versions, `OCR_DPI` or languages.
 
 Engines available to the benchmark: `tesseract`, `paddle-default`, `paddle-mobile`,
-`paddle-devanagari`. Datasets: `english` (3 documents) and `devanagari` (a Marathi receipt + a Hindi
+`paddle-devanagari`. Datasets: `english` (3 documents) and `hindi` (a Hindi receipt with Devanagari numerals + a Hindi
 agreement extract, rendered with a Devanagari system font; skipped if no such font is installed).
 
 ---
@@ -168,12 +168,12 @@ agreement extract, rendered with a Devanagari system font; skipped if no such fo
 | Symptom | Cause / fix |
 |---|---|
 | "OCR isn't available on this server" | No engine installed or `OCR_ENABLED=false`. Install Tesseract (§1a) and restart |
-| Log: "Tesseract is missing language packs: hin, mar" | `brew install tesseract-lang` (macOS) or `apt-get install tesseract-ocr-hin tesseract-ocr-mar` |
+| Log: "Tesseract is missing language packs: hin" | `brew install tesseract-lang` (macOS) or `apt-get install tesseract-ocr-hin` |
 | `pytesseract.TesseractNotFoundError` | The `tesseract` binary isn't on `PATH` for the backend process; check with `which tesseract` |
 | PaddleOCR is slow on the first document | It's downloading and loading models; later documents are faster (the model stays loaded) |
 | PaddleOCR import error after an upgrade | The 2.x → 3.x API changed; `ocr.py` handles both result formats. Reinstall with `uv sync --extra paddle` |
 | "The scan is too unclear to read" | Every page OCR'd to (almost) nothing. Rescan at 300 dpi or take a sharper photo |
-| Many `ocr_low_confidence` flags | Blur, skew or low light; or the wrong language (a Marathi page with `OCR_PADDLE_LANG=en`) |
+| Many `ocr_low_confidence` flags | Blur, skew or low light; or the wrong language (a Hindi page with `OCR_PADDLE_LANG=en`) |
 | Document stuck on "Reading…" after a server restart | Restarted mid-OCR. On startup it's marked failed with "Please upload the document again" (the file isn't stored, so OCR can't resume) |
 | Very slow on photos | Phone photos are capped at 3500 px on the long side before OCR; lower `OCR_DPI` for scans if needed |
 
@@ -185,7 +185,7 @@ agreement extract, rendered with a Devanagari system font; skipped if no such fo
 - OCR can misread digits (5↔6, 0↔8) and similar letters; that's why OCR'd items are labelled and
   the cross-document conflict flags matter.
 - Stamps, seals and signatures over text cause errors.
-- PaddleOCR reads one language per run; mixed English + Devanagari pages favour Tesseract with `eng+hin+mar`.
+- PaddleOCR reads one language per run; mixed English + Devanagari pages favour Tesseract with `eng+hin`.
 - The benchmark is small and synthetic (3 documents, 4 pages, English). It compares engines; it
   is not an accuracy claim for real-world documents.
 

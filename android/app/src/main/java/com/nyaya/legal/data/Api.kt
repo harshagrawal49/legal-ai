@@ -4,6 +4,7 @@ import com.nyaya.legal.BuildConfig
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -29,6 +30,7 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 interface NyayaService {
@@ -51,6 +53,11 @@ interface NyayaService {
     @DELETE("cases/{id}/documents/{docId}")
     suspend fun deleteDocument(@Path("id") id: String, @Path("docId") docId: String): retrofit2.Response<Unit>
     @GET("cases/{id}/evidence") suspend fun evidence(@Path("id") id: String): Evidence
+    @GET("cases/{id}/documents/{docId}/understanding")
+    suspend fun understanding(@Path("id") id: String, @Path("docId") docId: String, @Query("lang") lang: String): Understanding
+    @POST("cases/{id}/documents/{docId}/understanding/regenerate")
+    suspend fun regenerateUnderstanding(@Path("id") id: String, @Path("docId") docId: String, @Query("lang") lang: String): Understanding
+    @GET("documents") suspend fun allDocuments(): List<LibraryDocument>
     @POST("cases/{id}/brief") suspend fun brief(@Path("id") id: String): Brief
 }
 
@@ -59,7 +66,13 @@ sealed interface ChatEvent {
     data class Text(val delta: String) : ChatEvent
     data class Tool(val name: String) : ChatEvent
     /** `unverified` holds judgment ids and "<document id>:p<N>" references the backend could not verify. */
-    data class Done(val citedJudgments: List<String>, val unverified: Set<String> = emptySet()) : ChatEvent
+    data class Done(
+        val citedJudgments: List<String>,
+        val unverified: Set<String> = emptySet(),
+        val sources: List<ChatSource> = emptyList(),
+        /** Documents the user @-mentioned that the answer didn't cite. */
+        val uncitedMentions: List<String> = emptyList(),
+    ) : ChatEvent
     data class Error(val message: String) : ChatEvent
 }
 
@@ -84,8 +97,8 @@ object Api {
         .create(NyayaService::class.java)
 
     /** POST a chat message and stream back the reply as server-sent events. */
-    fun chat(caseId: String, message: String): Flow<ChatEvent> = callbackFlow {
-        val body = json.encodeToString(ChatRequest.serializer(), ChatRequest(message))
+    fun chat(caseId: String, message: String, mentions: List<String> = emptyList()): Flow<ChatEvent> = callbackFlow {
+        val body = json.encodeToString(ChatRequest.serializer(), ChatRequest(message, mentions))
             .toRequestBody("application/json".toMediaType())
         val request = Request.Builder()
             .url(BuildConfig.API_BASE_URL + "cases/$caseId/chat")
@@ -101,7 +114,10 @@ object Api {
                     "done" -> {
                         fun strings(key: String) = obj[key]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
                         val unverified = strings("unverified_citations") + strings("unverified_document_citations")
-                        trySend(ChatEvent.Done(strings("cited_judgments"), unverified.toSet()))
+                        val sources = obj["sources"]?.let {
+                            runCatching { json.decodeFromJsonElement(ListSerializer(ChatSource.serializer()), it) }.getOrNull()
+                        }.orEmpty()
+                        trySend(ChatEvent.Done(strings("cited_judgments"), unverified.toSet(), sources, strings("uncited_mentions")))
                         close()
                     }
                     "error" -> {

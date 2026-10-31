@@ -35,6 +35,7 @@ fun AppNavigation() {
             CaseListScreen(
                 onNewCase = { nav.navigate("intake") },
                 onOpenCase = { case -> nav.navigate("case/${case.id}") },
+                onOpenDocument = { caseId, docId -> nav.navigate(documentRoute(caseId, docId, null)) },
             )
         }
         composable("case/{caseId}") { entry ->
@@ -74,13 +75,14 @@ fun AppNavigation() {
         composable("judgment/{id}") { entry ->
             JudgmentScreen(id = entry.arguments!!.getString("id")!!, onBack = { nav.popBackStack() })
         }
-        composable("chat/{caseId}") { entry ->
+        composable("chat/{caseId}?mention={mention}") { entry ->
             val caseId = entry.arguments!!.getString("caseId")!!
             ChatScreen(
                 caseId = caseId,
                 onBack = { nav.popBackStack() },
                 onOpenJudgment = { nav.navigate("judgment/$it") },
                 onOpenDocument = { docId, page -> nav.navigate(documentRoute(caseId, docId, page)) },
+                initialMention = entry.arguments?.getString("mention"),
             )
         }
         composable("documents/{caseId}") { entry ->
@@ -93,11 +95,13 @@ fun AppNavigation() {
             )
         }
         composable("document/{caseId}/{docId}?page={page}") { entry ->
+            val caseId = entry.arguments!!.getString("caseId")!!
             DocumentScreen(
-                caseId = entry.arguments!!.getString("caseId")!!,
+                caseId = caseId,
                 docId = entry.arguments!!.getString("docId")!!,
                 page = entry.arguments?.getString("page")?.toIntOrNull(),
                 onBack = { nav.popBackStack() },
+                onAsk = { docId -> nav.navigate("chat/$caseId?mention=$docId") },
             )
         }
         composable("brief/{caseId}") { entry ->

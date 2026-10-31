@@ -175,7 +175,8 @@ private fun DocumentList(
 ) {
     if (docs.isEmpty()) {
         Text(
-            "No documents yet. Upload a text-based PDF such as an agreement to sell, a receipt or a notice. " +
+            "No documents yet. Upload an agreement to sell, a receipt, a notice or a land record (PDF or photo). " +
+                "Each one is explained in plain language. " +
                 "Scans and phone photos (JPG/PNG) are read with OCR; check the extracted details against the original.",
             Modifier.padding(16.dp),
         )
@@ -193,7 +194,7 @@ private fun DocumentList(
                                 doc.documentType?.let(::humanise),
                                 "${doc.pageCount} pages",
                                 if (doc.ocrPages > 0) "${doc.ocrPages} read by OCR" else null,
-                                statusLabel(doc.status),
+                                if (doc.status == "processed" && doc.understood) "Explained" else statusLabel(doc.status),
                             )
                                 .joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,

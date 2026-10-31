@@ -16,6 +16,8 @@ SINGLE_VALUE_AMOUNTS = {"total_consideration", "advance_or_earnest_money"}
 SINGLE_DATE_EVENTS = {"agreement_signed", "registration", "deadline"}
 MULTIPLIERS = {"lakh": Decimal(100_000), "lakhs": Decimal(100_000), "lac": Decimal(100_000),
                "crore": Decimal(10_000_000), "crores": Decimal(10_000_000)}
+# Hindi. Matched as plain substrings: \b is unreliable next to Devanagari vowel signs.
+DEVANAGARI_MULTIPLIERS = {"लाख": Decimal(100_000), "करोड़": Decimal(10_000_000), "करोड": Decimal(10_000_000)}
 
 
 def page_source(doc: CaseDocument, page: int | None) -> dict:
@@ -103,6 +105,9 @@ def parse_amount(value: str) -> Decimal | None:
         return None
     for word, factor in MULTIPLIERS.items():
         if re.search(rf"\b{word}\b", text):
+            return amount * factor
+    for word, factor in DEVANAGARI_MULTIPLIERS.items():
+        if word in text:
             return amount * factor
     return amount
 
@@ -246,6 +251,17 @@ def build_flags(docs: list[CaseDocument]) -> list[dict]:
             "No property identifier (survey, plot, khata or flat number) was found in the uploaded documents.",
             [],
         ))
+
+    # Values the rule-based NLP found on a page that the LLM extraction didn't include.
+    kinds = {"amount": "An amount", "date": "A date", "property_identifier": "A property identifier"}
+    for doc in processed:
+        for missed in doc.facts.get("possibly_missed", []):
+            flags.append(_flag(
+                "possibly_missed",
+                f"{doc.filename}: {kinds.get(missed['kind'], 'A value')} \"{missed['value']}\" appears on page "
+                f"{missed['source']['page']} but wasn't extracted. Check whether it matters.",
+                [source_ref(doc, missed["source"])],
+            ))
 
     # Ambiguities the extraction noticed inside a single document.
     for doc in processed:

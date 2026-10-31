@@ -75,7 +75,7 @@ def make_photo(text: str, fmt: str = "JPEG") -> bytes:
     return buffer.getvalue()
 
 
-# ---------- Devanagari (Marathi / Hindi) samples ----------
+# ---------- Hindi (Devanagari) samples ----------
 # PyMuPDF's Story layout engine shapes Devanagari correctly (conjuncts such as श्र, क्ष), unlike
 # Pillow without libraqm. It needs a Devanagari font on the machine; macOS ships these.
 
@@ -87,15 +87,14 @@ DEVANAGARI_FONTS = [
 ]
 
 DEVANAGARI_SAMPLES = {
-    # Marathi receipt with Devanagari numerals, as on many Maharashtra documents.
-    "pavati_marathi.pdf": [
-        "कृत्रिम नमुना दस्तऐवज - काल्पनिक, केवळ चाचणीसाठी\n\n"
-        "पावती\n\n"
+    # Hindi receipt with Devanagari numerals.
+    "rasid_hindi.pdf": [
+        "कृत्रिम नमूना दस्तावेज - काल्पनिक, केवल परीक्षण के लिए\n\n"
+        "रसीद\n\n"
         "दिनांक: १५/०३/२०२३\n\n"
-        "श्रीमती मीरा अय्यर यांच्याकडून मौजे वडगाव, तालुका हवेली, जिल्हा पुणे येथील सर्वे क्रमांक "
-        "१२३/४ या भूखंडाच्या विक्रीपोटी अग्रिम रक्कम रुपये ५,००,००० (अक्षरी रुपये पाच लाख फक्त) "
-        "धनादेश क्रमांक ००४५१२ द्वारे मिळाली.\n\n"
-        "रक्कम स्वीकारणार: रवी कुलकर्णी"
+        "श्रीमती मीरा अय्यर से ग्राम वडगाँव, तहसील हवेली, जिला पुणे स्थित सर्वे नंबर १२३/४ के भूखंड की बिक्री हेतु "
+        "अग्रिम राशि रुपये ५,००,००० (शब्दों में रुपये पाँच लाख मात्र) चेक संख्या ००४५१२ द्वारा प्राप्त हुई।\n\n"
+        "प्राप्तकर्ता: रवि कुलकर्णी"
     ],
     # Hindi agreement extract with ASCII numerals.
     "anubandh_hindi.pdf": [
@@ -108,7 +107,7 @@ DEVANAGARI_SAMPLES = {
 }
 
 DEVANAGARI_KEY_VALUES = {
-    "pavati_marathi.pdf": ["मीरा अय्यर", "रवी कुलकर्णी", "१२३/४", "५,००,०००", "१५/०३/२०२३"],
+    "rasid_hindi.pdf": ["मीरा अय्यर", "रवि कुलकर्णी", "१२३/४", "५,००,०००", "१५/०३/२०२३"],
     "anubandh_hindi.pdf": ["रवि कुलकर्णी", "मीरा अय्यर", "123/4", "45,00,000", "5,00,000"],
 }
 

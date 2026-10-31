@@ -1,0 +1,293 @@
+{
+  "run_at": "2026-10-31T17:52:01",
+  "seed": 7,
+  "cases": 200,
+  "documents": 517,
+  "languages": {
+    "en": 117,
+    "hi": 83
+  },
+  "sections": {
+    "nlp_text": {
+      "title": "1. Rule-based NLP on document text",
+      "rows": [
+        {
+          "metric": "Amounts",
+          "tp": 917,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9958281641489697,
+            0.9999999999999998
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9958281641489697,
+            0.9999999999999998
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "Dates",
+          "tp": 834,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9954148851047738,
+            0.9999999999999999
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9954148851047738,
+            0.9999999999999999
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "Property identifiers",
+          "tp": 517,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9926242450679823,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9926242450679823,
+            1.0
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "**All key values**",
+          "tp": 2268,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9983090370384977,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9983090370384977,
+            1.0
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "All key values: English",
+          "tp": 1521,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.997480656351453,
+            0.9999999999999999
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.997480656351453,
+            0.9999999999999999
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "All key values: Hindi",
+          "tp": 747,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9948836079407429,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9948836079407429,
+            1.0
+          ],
+          "f1": 1.0
+        }
+      ],
+      "note": ""
+    },
+    "ocr": {
+      "title": "2. After OCR",
+      "rows": [],
+      "note": "Skipped: --ocr-cases 0"
+    },
+    "understanding": {
+      "title": "2b. Document understanding: legal terms, document type, language",
+      "rows": [
+        {
+          "metric": "Glossary terms spotted",
+          "tp": 2185,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9982449163977879,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9982449163977879,
+            1.0
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "Document type (rule-based classifier), accuracy",
+          "tp": 517,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9926242450679823,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9926242450679823,
+            1.0
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "Document language, accuracy",
+          "tp": 517,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9926242450679823,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9926242450679823,
+            1.0
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "Chat message language (en / hi / Hinglish, 24 labelled), accuracy",
+          "tp": 24,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.8620194241710247,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.8620194241710247,
+            1.0
+          ],
+          "f1": 1.0
+        }
+      ],
+      "note": "For accuracy rows, precision = recall = accuracy and FP/FN both count the wrong answers.",
+      "info": {
+        "type_confusion": {
+          "agreement_to_sell": {
+            "agreement_to_sell": 200
+          },
+          "receipt": {
+            "receipt": 200
+          },
+          "legal_notice": {
+            "legal_notice": 117
+          }
+        },
+        "chat_language_errors": []
+      }
+    },
+    "flags": {
+      "title": "3. Evidence flags (cross-document discrepancies)",
+      "rows": [
+        {
+          "metric": "Survey-number difference flagged",
+          "tp": 81,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.954720325877871,
+            0.9999999999999999
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.954720325877871,
+            0.9999999999999999
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "Advance-amount difference flagged",
+          "tp": 82,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9552478052599207,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9552478052599207,
+            1.0
+          ],
+          "f1": 1.0
+        },
+        {
+          "metric": "**All planted discrepancies**",
+          "tp": 163,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9769745674939582,
+            0.9999999999999999
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9769745674939582,
+            0.9999999999999999
+          ],
+          "f1": 1.0
+        }
+      ],
+      "note": "Planted: 81 survey-number and 82 amount differences; the rest must raise no flag."
+    },
+    "provenance": {
+      "title": "4. Provenance checking of the fact sheet",
+      "rows": [
+        {
+          "metric": "Document refs kept only when the page supports the value",
+          "tp": 600,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "precision_ci": [
+            0.9936380666717896,
+            1.0
+          ],
+          "recall": 1.0,
+          "recall_ci": [
+            0.9936380666717896,
+            1.0
+          ],
+          "f1": 1.0
+        }
+      ],
+      "note": "Per case: 3 correct refs and 4 bad ones (name not on the page, wrong amount, page that doesn't exist, unknown document)."
+    }
+  }
+}

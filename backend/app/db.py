@@ -23,6 +23,9 @@ def init_db() -> None:
     # create_all doesn't add columns to existing tables; small additive changes until Alembic is set up.
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE case_documents ADD COLUMN IF NOT EXISTS page_info JSONB DEFAULT '[]'::jsonb"))
+        conn.execute(text("ALTER TABLE case_documents ADD COLUMN IF NOT EXISTS understanding JSONB DEFAULT '{}'::jsonb"))
+        conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sources JSONB DEFAULT '[]'::jsonb"))
+        conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS mentions JSONB DEFAULT '[]'::jsonb"))
 
 
 def get_db() -> Iterator[Session]:

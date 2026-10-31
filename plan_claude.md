@@ -396,8 +396,17 @@ project/
   Tesseract (default) or PaddleOCR (optional extra), behind one engine interface. OCR runs in the
   background; per-page source/engine/confidence is stored in `page_info`; `ocr_used`,
   `ocr_low_confidence` and `ocr_page_not_read` flags; `from_ocr` on every source. Engine benchmark
-  in `eval/run_ocr_eval.py` (English + Marathi/Hindi). Decision: **Tesseract** (`docs/ocr_report.md`),
+  in `eval/run_ocr_eval.py` (English + Hindi). Decision: **Tesseract** (`docs/ocr_report.md`),
   plus an adaptive denoise retry for low-confidence pages.
+- **Documents as source of truth** (`docs/case_facts.md`): the fact sheet is built from the user's
+  text (optional) + document facts, with per-item sources checked in code, user-vs-document
+  conflicts, rule-based NLP cross-check (`app/services/nlp.py`, English/Hindi), automatic
+  rebuild after each processed document, and documents-only cases. 75 tests pass.
+- **Scope (2026-10-31)**: documents English/Hindi only; chat English/Hindi/Hinglish; Marathi removed.
+- **Document understanding** (`doc_plan.md`): glossary term spotting, language ID (en/hi/Hinglish),
+  rule-based classifier, plain-language explanations checked in code (pages, quotes, values, advice),
+  cached per language; All my documents; chat `@` mentions and per-reply Sources. Scorecard
+  (`eval/run_all.py`, 200 synthetic cases) and `docs/eval_report.md`. 102 tests pass.
 - **Remaining**: compile and test the Android build;  run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
   plus representative errors in `docs/evaluation.md`; add a retrieval eval with fixed questions.
 

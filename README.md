@@ -94,6 +94,29 @@ uv run python -c "from eval.samples import SAMPLES, make_pdf; [open(f'/tmp/{n}',
 `http://10.0.2.2:8000/`, which is your machine as seen from the emulator. From the command line,
 run `cd android && ./gradlew assembleDebug`.
 
+## Document understanding
+
+Every uploaded document (from the new-case screen, My documents or 📎 in chat) is listed in the case's
+**My documents** and in **All my documents** across cases. Opening one shows **Explained**: a one-line
+description, a plain-language summary and clause explanations, each linked to its page. Legal terms
+use meanings from a curated glossary (`app/data/legal_glossary.json`, 46 Indian property-law terms with
+Hindi names) rather than the model's own definitions, and there's a list of things to check. It's
+available in English, Hindi or Hinglish. Code drops any explanation statement whose amounts, dates or
+survey numbers aren't in the document, or that gives advice.
+
+In chat, type **@** to refer to a document; the answer then focuses on it. Every reply shows its
+**Sources** (document pages, judgments), or says it's general information. Plan: [`doc_plan.md`](doc_plan.md).
+Evaluation: [`docs/eval_report.md`](docs/eval_report.md).
+
+## Case facts: documents + the user's account
+
+The case fact sheet is built from **the user's documents (primary record) and what the user says
+(optional)**. Every party, event and amount carries its source (`user` / `D:<document>:p<page>`),
+document references are checked against the page in code, and disagreements between the user and the
+documents are kept as conflicts. Rule-based NLP (`app/services/nlp.py`: Indian amounts, dates and survey
+numbers in English and Hindi) cross-checks the AI's extraction and flags values it missed. A
+case can start from documents alone. Details and measurements: [`docs/case_facts.md`](docs/case_facts.md).
+
 ## OCR (scanned PDFs and photos)
 
 Scanned pages and JPG/PNG photos are read locally with **Tesseract** (default, chosen by benchmark:
@@ -152,17 +175,21 @@ works by changing `LLM_BASE_URL`, `LLM_API_KEY` and the model names in `.env`:
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/cases` | New case from a description → fact sheet + questions |
+| POST | `/cases` | New case from a description (optional: empty = start from documents) → fact sheet + questions |
 | POST | `/cases/{id}/intake` | Answer questions / add details |
 | PUT | `/cases/{id}/fact-sheet` | User edits the summary |
 | POST | `/cases/{id}/search` | Find and explain similar judgments |
 | GET | `/cases/{id}/results` | Saved results |
-| GET/POST | `/cases/{id}/chat` | History / send a message (SSE stream) |
+| GET/POST | `/cases/{id}/chat` | History (with sources and mentions) / send a message, with optional `mentions` (document ids referenced by @); SSE stream ends with `sources` |
 | GET | `/judgments/{id}` | Judgment summary and full paragraphs |
 | POST | `/cases/{id}/documents` | Upload a PDF or JPG/PNG photo (multipart `file`) → page text; OCR + facts in the background (415 unsupported type, 413 too large) |
 | GET | `/cases/{id}/documents` | Uploaded documents and their status |
 | GET/DELETE | `/cases/{id}/documents/{doc_id}` | Page text and facts / delete document and its data |
 | POST | `/cases/{id}/documents/{doc_id}/extract` | Retry fact extraction |
+| GET | `/cases/{id}/documents/{doc_id}/understanding?lang=en\|hi\|hinglish` | Plain-language explanation (generated once per language, cached) |
+| POST | `/cases/{id}/documents/{doc_id}/understanding/regenerate` | Rebuild the explanation |
+| GET | `/documents` | All my documents, across cases |
+| GET | `/glossary`, `/glossary/{term_id}` | Curated legal glossary |
 | GET | `/cases/{id}/evidence` | Chronology and gap/conflict flags with page sources |
 | POST | `/cases/{id}/brief` | Draft case-preparation brief (returned for review only) |
 

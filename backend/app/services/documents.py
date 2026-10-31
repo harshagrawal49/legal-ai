@@ -30,7 +30,7 @@ from app.llm import prompts
 from app.llm.client import LLMRefusal, structured
 from app.llm.schemas import DocumentFacts
 from app.models import Case, CaseDocument
-from app.services import ocr
+from app.services import nlp, ocr
 
 log = logging.getLogger(__name__)
 
@@ -212,13 +212,16 @@ def _wrap(filename: str, parts: list[str]) -> str:
 
 
 def extract_facts(filename: str, pages: list[str]) -> dict:
-    """LLM extraction validated against DocumentFacts, then dates and page references checked in code."""
+    """LLM extraction validated against DocumentFacts, then checked in code: dates, page references
+    (quotes must exist on the cited page), and rule-based NLP (app/services/nlp.py), which marks
+    amounts/dates/identifiers it also found as `corroborated` and lists what the LLM missed."""
     user_prompt, truncated_after = _document_prompt(filename, pages)
     facts = structured(
         DocumentFacts, prompts.DOCUMENT_EXTRACTION_SYSTEM, user_prompt, model=get_settings().model_fast
     ).model_dump()
     _clean_dates(facts)
     verify_sources(facts, pages)
+    nlp.cross_check(facts, pages)
     facts["truncated_after_page"] = truncated_after
     return facts
 
@@ -277,15 +280,28 @@ def extract_in_background(document_id: uuid.UUID, pdf: bytes | None = None) -> N
         doc = db.get(CaseDocument, document_id)
         if doc is None or doc.status != "processing":
             return
+        processed = False
         try:
             if pdf is not None and needs_ocr(doc):
                 run_ocr(doc, pdf)
             if doc.status == "processing":
                 _run_extraction(doc)
+            processed = doc.status == "processed"
+            if processed:
+                from app.services import understanding  # imported here: understanding imports this module
+
+                try:  # the explanation is extra: a failure here must not fail the document
+                    understanding.ensure_understanding(doc, "en")
+                except Exception:
+                    log.exception("document understanding crashed for %s", document_id)
         except Exception:  # never leave a document stuck in `processing`
             log.exception("fact extraction crashed for document %s", document_id)
             doc.status, doc.error = "text_only", "Fact extraction failed. Try again."
         db.commit()
+        if processed:  # fold the new facts into the case's fact sheet
+            from app.services import intake  # imported here: intake imports this module's helpers
+
+            intake.refresh_after_document(db, doc.case_id)
 
 
 def recover_interrupted(db) -> None:

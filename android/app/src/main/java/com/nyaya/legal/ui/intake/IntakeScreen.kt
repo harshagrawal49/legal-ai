@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import com.nyaya.legal.data.UPLOAD_MIMES
 import com.nyaya.legal.data.uploadDocument
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
@@ -79,8 +80,32 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
             busy = "Uploading documents (${i + 1}/${pendingFiles.size})…"
             runCatching { uploadDocument(resolver, created.id, uri) }.onFailure { failed += "$name: ${Api.errorMessage(it)}" }
         }
+        val uploaded = pendingFiles.size - failed.size
         pendingFiles.clear()
         if (failed.isNotEmpty()) error = "Some documents were not uploaded:\n" + failed.joinToString("\n")
+        if (uploaded > 0) waitForDocuments(created.id)
+    }
+
+    /** True while uploaded documents are still being read; the summary updates when they're done. */
+    var readingDocuments by mutableStateOf(false)
+        private set
+
+    /** The server folds each processed document into the fact sheet; refresh until all are done. */
+    private fun waitForDocuments(caseId: String) {
+        readingDocuments = true
+        viewModelScope.launch {
+            repeat(60) { // up to ~3 minutes
+                delay(3000)
+                val docs = runCatching { Api.service.documents(caseId) }.getOrNull() ?: return@repeat
+                if (docs.none { it.status == "processing" }) {
+                    delay(1500) // the fact-sheet rebuild runs right after the last document
+                    runCatching { case = Api.service.getCase(caseId) }
+                    readingDocuments = false
+                    return@launch
+                }
+            }
+            readingDocuments = false
+        }
     }
 
     fun submitAnswer(text: String) = run("Updating the summary…") {
@@ -133,6 +158,7 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
             when {
                 busy != null -> Loading(busy)
                 case == null -> DescribeStep(vm.pendingFiles, onSubmit = { vm.submitDescription(it, resolver) })
+                vm.readingDocuments && case.factSheet.summary.isBlank() -> Loading("Reading your documents and building the case summary…")
                 else -> ReviewStep(case, onAnswer = vm::submitAnswer, onConfirm = { vm.search(onResults) }, onAttach = { onDocuments(case.id) })
             }
         }
@@ -148,7 +174,7 @@ private fun DescribeStep(files: MutableList<Pair<Uri, String>>, onSubmit: (Strin
     }
     Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("What happened?", style = MaterialTheme.typography.titleLarge)
-        Text("Describe your situation in your own words: who is involved, what was agreed, what went wrong and what you want. No legal terms needed.")
+        Text("Describe your situation in your own words: who is involved, what was agreed, what went wrong and what you want. No legal terms needed. You can also skip this and just attach your documents.")
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
@@ -173,9 +199,20 @@ private fun DescribeStep(files: MutableList<Pair<Uri, String>>, onSubmit: (Strin
             Text(if (files.isEmpty()) "Attach documents" else "Attach more", Modifier.padding(start = 8.dp))
         }
 
-        Button(onClick = { onSubmit(text.trim()) }, enabled = text.trim().length >= 20, modifier = Modifier.fillMaxWidth()) {
-            Text("Continue")
+        val trimmed = text.trim()
+        Button(
+            onClick = { onSubmit(trimmed) },
+            // Either a description, or documents alone: the case is then built from the documents.
+            enabled = trimmed.length >= 20 || (trimmed.isEmpty() && files.isNotEmpty()),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (trimmed.isEmpty() && files.isNotEmpty()) "Continue with documents only" else "Continue")
         }
+        Text(
+            "Your documents are the main record: names, dates, amounts and survey numbers are taken from them, " +
+                "and anything that differs from what you wrote is shown so you can check it.",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -230,19 +267,45 @@ private fun ReviewStep(case: CaseDetail, onAnswer: (String) -> Unit, onConfirm: 
 }
 
 @Composable
-fun FactSheetCard(fs: FactSheet) {
+fun FactSheetCard(fs: FactSheet, filenames: Map<String, String> = emptyMap()) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(fs.summary)
-            Section("Parties", fs.parties.map { "${it.name} (${it.role})" })
-            Section("Timeline", fs.events.map { listOfNotNull(it.date, it.description).joinToString(": ") })
-            Section("Amounts", fs.amounts.map { "${it.description}: ${it.value}" })
+            if (fs.conflicts.isNotEmpty()) {
+                Text("Differences to check", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+                fs.conflicts.forEach { c ->
+                    Text(
+                        "• ${c.description}: " + (c.userSays?.let { "you said $it; " } ?: "") +
+                            "documents say ${c.documentsSay}" + sourcesText(c.sources, filenames),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            Section("Parties", fs.parties.map { "${it.name} (${it.role})" + sourcesText(it.sources, filenames) })
+            Section("Timeline", fs.events.map { listOfNotNull(it.date, it.description).joinToString(": ") + sourcesText(it.sources, filenames) })
+            Section("Amounts", fs.amounts.map { "${it.description}: ${it.value}" + sourcesText(it.sources, filenames) })
             Section("What you want", listOfNotNull(fs.reliefSought))
             Section("Legal issues", fs.issues)
             Section("Relevant laws", fs.legalAreas)
             Section("Still unknown", fs.missingInfo)
         }
     }
+}
+
+private val DOC_REF = Regex("""^D:([0-9a-f-]+):p(\d+)$""")
+
+/** " · from receipt.pdf p.1 · you said", " · source not confirmed", or "" for older summaries. */
+private fun sourcesText(sources: List<String>, filenames: Map<String, String>): String {
+    if (sources.isEmpty()) return ""
+    val parts = sources.mapNotNull { src ->
+        when {
+            src == "user" -> "you said"
+            src == "unverified" -> "source not confirmed"
+            else -> DOC_REF.matchEntire(src)?.let { m -> "from ${filenames[m.groupValues[1]] ?: "your document"} p.${m.groupValues[2]}" }
+        }
+    }
+    return if (parts.isEmpty()) "" else " · " + parts.distinct().joinToString(" · ")
 }
 
 @Composable

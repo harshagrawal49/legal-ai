@@ -1,5 +1,6 @@
 # OCR for scanned documents: plan
 
+> Scope: documents are **English or Hindi** (Marathi was dropped from scope on 2026-10-31).
 > Status: **implemented**. Engine decision: **Tesseract** (see [`docs/ocr_report.md`](docs/ocr_report.md)). Step-by-step reference: [`docs/ocr_steps.md`](docs/ocr_steps.md).
 > Goal: scanned PDFs and phone photos of property documents become page-linked text. Low-quality
 > pages are flagged instead of silently trusted, and nothing is ever made up.
@@ -12,7 +13,7 @@ documents people actually hold are scans or photos:
 
 - old sale deeds and agreements to sell, usually scanned at a registrar or a photocopy shop;
 - receipts and stamp paper photographed on a phone;
-- 7/12 extracts and other property records, often in **Marathi or Hindi (Devanagari)**;
+- land records and other property papers, often in **Hindi (Devanagari)**;
 - mixed PDFs: a typed agreement with scanned annexures.
 
 So OCR is the biggest coverage gap in the document workflow.
@@ -26,7 +27,7 @@ So OCR is the biggest coverage gap in the document workflow.
 | **Tesseract 5** (via `pytesseract` + PyMuPDF rendering) | Yes: `hin`, `mar`, plus others (`ben`, `tam`, `tel`, `guj`, `kan`, …) | Fast, about 1–3 s per page | ~50 MB binary + ~15 MB per language | Fully local | Per-word (`image_to_data`) | ✅ **Chosen** |
 | PyMuPDF's built-in OCR (`page.get_textpage_ocr`) | Same as Tesseract (it calls Tesseract) | Same | No new Python package | Local | ❌ No per-word confidence | Partial fallback |
 | OCRmyPDF | Tesseract underneath | OK | Needs Ghostscript, unpaper, qpdf | Local | Indirect | Overkill: it produces PDF/A files, but we only need text |
-| EasyOCR | Hindi, Marathi | Slow on CPU; PyTorch ~1–2 GB | Large | Local | Yes | Too heavy for a laptop backend |
+| EasyOCR | Hindi | Slow on CPU; PyTorch ~1–2 GB | Large | Local | Yes | Too heavy for a laptop backend |
 | PaddleOCR | Devanagari models | Moderate; Paddle framework | Large | Local | Yes | Heavier install, Apple-Silicon support is uneven |
 | Surya OCR | Strong multilingual | Slow without a GPU | Large (transformer models) | Local | Yes | Licence restrictions on model weights; needs a GPU to be practical |
 | docTR | Mainly Latin scripts | Moderate | PyTorch/TF | Local | Yes | Weak on Devanagari |
@@ -49,9 +50,9 @@ class OcrEngine(Protocol):
 | | Tesseract 5 (`pytesseract`) | PaddleOCR (`paddleocr` + `paddlepaddle`) |
 |---|---|---|
 | Role | **Default to start with**; always installed | **Optional extra** (`uv sync --extra paddle`) |
-| Strengths | Light, fast on CPU, mature Hindi/Marathi language packs, word-level confidence, simple install | Usually more accurate on photos, skew, low light, stamps and complex layouts; line-level confidence |
+| Strengths | Light, fast on CPU, mature Hindi language pack, word-level confidence, simple install | Usually more accurate on photos, skew, low light, stamps and complex layouts; line-level confidence |
 | Weaknesses | Weaker on poor photos and complex layouts | Heavy framework and model downloads; fiddlier on Apple Silicon; API changed between 2.x and 3.x; one recognition language per instance; Devanagari quality unproven |
-| Setting | `OCR_ENGINE=tesseract` | `OCR_ENGINE=paddle` (`OCR_PADDLE_LANG=en`, or `hi`/`mr` for Devanagari) |
+| Setting | `OCR_ENGINE=tesseract` | `OCR_ENGINE=paddle` (`OCR_PADDLE_LANG=en`, or `hi` for Hindi) |
 
 `OCR_ENGINE=auto` (the default) uses Tesseract when it's installed, otherwise PaddleOCR.
 
@@ -87,7 +88,7 @@ if no page needs OCR → status "processing" → fact extraction (as today)
 else                 → status "processing" (stage "ocr") → BACKGROUND:
                           render each page at 300 dpi (PyMuPDF)
                           → preprocess (grayscale, auto-contrast, deskew)
-                          → Tesseract eng+hin+mar → text + mean word confidence
+                          → Tesseract eng+hin → text + mean word confidence
                           → page confidence < OCR_MIN_CONFIDENCE → page kept but flagged
                           → all pages unreadable → status "failed" ("image too unclear")
                         → fact extraction on the combined text (as today)
@@ -129,8 +130,8 @@ small, safe step; a proper move to Alembic migrations stays on the backlog.
 |---|---|---|
 | `OCR_ENABLED` | `true` | Turn OCR off entirely; scanned PDFs then fail with a clear message |
 | `OCR_ENGINE` | `auto` | `tesseract`, `paddle`, or `auto` (Tesseract if installed, else PaddleOCR) |
-| `OCR_LANGUAGES` | `eng+hin+mar` | Tesseract language packs |
-| `OCR_PADDLE_LANG` | `en` | PaddleOCR recognition language (`hi` / `mr` for Devanagari documents) |
+| `OCR_LANGUAGES` | `eng+hin` | Tesseract language packs |
+| `OCR_PADDLE_LANG` | `en` | PaddleOCR recognition language (`hi` for Hindi documents) |
 | `OCR_DPI` | `300` | Render resolution (300 is the usual sweet spot for accuracy vs. speed) |
 | `OCR_MAX_PAGES` | `30` | Bigger scans: OCR the first 30 pages and flag the rest |
 | `OCR_MIN_CONFIDENCE` | `60` | Pages below this mean word confidence get `ocr_low_confidence` |
@@ -195,7 +196,7 @@ If Tesseract isn't installed, startup logs a clear warning and uploads keep work
   - excerpt-verified rate;
   - seconds per page;
   - whether low-quality pages are correctly flagged.
-- Optional: a synthetic **Marathi/Hindi** sample (needs a Devanagari font such as Noto Sans
+- A synthetic **Hindi** sample (needs a Devanagari font such as Noto Sans
   Devanagari, OFL-licensed, to render the test images).
 - Record the results in `docs/evaluation.md` (new "OCR" section). This also gives the presentation
   a concrete chart: CER by scan quality.
@@ -229,7 +230,7 @@ If Tesseract isn't installed, startup logs a clear warning and uploads keep work
 
 ## 7. Decisions (taken)
 
-1. **Languages**: `eng+hin+mar` for Tesseract; `en` for PaddleOCR (switch to `hi`/`mr` for Devanagari documents).
+1. **Languages**: `eng+hin` for Tesseract; `en` for PaddleOCR (`hi` for Hindi documents). Marathi is out of scope.
 2. **Photo uploads (M4)**: included.
 3. **Engines**: both Tesseract and PaddleOCR, compared by `eval/run_ocr_eval.py`. The benchmark
    chose **Tesseract** as the default ([`docs/ocr_report.md`](docs/ocr_report.md)); PaddleOCR stays optional.

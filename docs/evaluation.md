@@ -1,5 +1,8 @@
 # Baseline evaluation
 
+> Scope: documents in **English or Hindi**; chat in English, Hindi or Hinglish. Marathi was dropped on
+> 2026-10-31; results below that mention it were measured before that and are kept for the record.
+
 This is evaluation, not training. It measures the document workflow on a fixed benchmark so later
 changes to prompts, validation or retrieval can be compared fairly.
 
@@ -47,7 +50,7 @@ Each run is saved to `backend/eval/results/<timestamp>.json`.
 | 2026-10-28 | v1 | none (deterministic only) | PDF handling 7/7 checks passed |
 | — | v1 | `gemini-3.8-flash` (default) | **Not yet run**: no API key was configured in the development environment |
 
-Unit tests (`uv run pytest`, 59 passing + 2 real-engine tests skipped unless installed, on 2026-10-31) cover PDF failure paths, OCR, safety-rule wiring, excerpt verification,
+Unit tests (`uv run pytest`, 75 passing + 1 PaddleOCR test skipped unless requested, on 2026-10-31) cover PDF failure paths, OCR, rule-based NLP and document-grounded case facts, safety-rule wiring, excerpt verification,
 evidence flags, document citation checks, the brief's section separation and LLM fallback, and the
 document API routes. These run with the LLM faked out, so they test the code around the model, not
 the model's extraction quality.
@@ -96,11 +99,11 @@ compared with the original text. "Key values" = the 10 names, survey numbers and
 | 2026-10-31 | PaddleOCR 3.7 (PP-OCRv6 medium, `en`, CPU, Apple Silicon) | clean | 0.3% | 2.3% | 79% | 26.6 | 100 |
 | 2026-10-31 | PaddleOCR 3.7 | photo | 2.3% | 4.4% | 79% | 25.5 | 99 |
 | 2026-10-31 | PaddleOCR 3.7 | degraded | 5.2% | 11.8% | 57% | 25.8 | 84 |
-| 2026-10-31 | Tesseract 5.5.4 (`eng+hin+mar`, with denoise retry) | clean | 0.2% | 1.5% | 79% | 0.5 | 95 |
+| 2026-10-31 | Tesseract 5.5.4 (`eng+hin+mar` at the time; now `eng+hin`, with denoise retry) | clean | 0.2% | 1.5% | 79% | 0.5 | 95 |
 | 2026-10-31 | Tesseract 5.5.4 | photo | 0.3% | 2.0% | 79% | 0.6 | 95 |
 | 2026-10-31 | Tesseract 5.5.4 | degraded | 30.9% | 49.4% | 50% | 2.0 | 70 |
 
-**Full four-engine comparison (English + Marathi/Hindi, memory, errors, conclusion): [`ocr_report.md`](ocr_report.md).**
+**Full four-engine comparison (English + Hindi, memory, errors, conclusion): [`ocr_report.md`](ocr_report.md).**
 Decision: **Tesseract is the default** (100% key values on clean and photo Devanagari scans, about 40× faster,
 ~0.1 GB against up to ~15 GB peak memory).
 
@@ -124,8 +127,18 @@ Raw results: `backend/eval/results/ocr-20261031-144556.json`.
    amount) → every OCR'd item is labelled "read by OCR, check digits and names".
 3. Tesseract was weak on degraded scans → adaptive 3×3 median-filter retry for low-confidence pages
    (degraded key values 36% → 50% English, 20% → 50% Devanagari).
-4. Marathi survey numbers were erased by identifier normalisation → fixed (`_norm_id` keeps
+4. Devanagari survey numbers (e.g. `१२३/४`) were erased by identifier normalisation → fixed (`_norm_id` keeps
    Devanagari and maps its digits; tested).
+
+## Rule-based NLP and document-grounded case facts
+
+| Check | Result |
+|---|---|
+| Rule-based extractors on sample text (3 English + 2 Hindi documents, 20 expected values) | **20/20** (`eval/run_eval.py`, deterministic) |
+| Same, on Tesseract OCR output: clean / photo / degraded | English 13/13 · 13/13 · 4/13; Hindi + Devanagari set 7/7 · 7/7 · 4/7 (measured with one Marathi page, since dropped from scope) |
+| LLM fusion of user text + document facts | not yet measured (needs an API key); provenance is checked in code regardless |
+
+Details: [`case_facts.md`](case_facts.md).
 
 ## Not yet evaluated
 

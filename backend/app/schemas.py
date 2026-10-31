@@ -9,7 +9,8 @@ from app.llm.schemas import FactSheet
 
 
 class NewCaseIn(BaseModel):
-    description: str = Field(min_length=20, max_length=20000)
+    # Optional: a case can start from documents alone; its fact sheet is then built from them.
+    description: str = Field(default="", max_length=20000)
 
 
 class IntakeAnswerIn(BaseModel):
@@ -22,6 +23,7 @@ class FactSheetIn(BaseModel):
 
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=10000)
+    mentions: list[uuid.UUID] = Field(default_factory=list, max_length=5)  # documents referenced with @
 
 
 class JudgmentBrief(BaseModel):
@@ -87,6 +89,8 @@ class ChatMessageOut(BaseModel):
     role: str
     display_text: str
     created_at: datetime
+    sources: list[dict] = []  # assistant replies: verified documents/pages and judgments cited
+    mentions: list[str] = []  # user messages: document ids referenced with @
 
 
 # ---------- Uploaded documents, evidence pack and brief ----------
@@ -100,6 +104,8 @@ class DocumentSummaryOut(BaseModel):
     document_type: str | None
     page_count: int
     ocr_pages: int = 0  # pages whose text was read by OCR
+    understood: bool = False  # a plain-language explanation is ready (GET .../understanding)
+    language: str | None = None  # en | hi (detected from the text)
     created_at: datetime | None
 
 
@@ -107,6 +113,19 @@ class DocumentOut(DocumentSummaryOut):
     pages: list[str]
     page_info: list[dict] = []  # per page: {"source": "text" | "ocr" | ..., "engine", "confidence"}
     facts: dict
+
+
+class LibraryDocumentOut(BaseModel):
+    """One document in the user's library across all cases."""
+    id: uuid.UUID
+    case_id: uuid.UUID
+    case_title: str
+    filename: str
+    status: str
+    document_type: str | None
+    page_count: int
+    understood: bool
+    created_at: datetime | None
 
 
 class SourceRefOut(BaseModel):

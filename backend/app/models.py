@@ -105,6 +105,8 @@ class CaseDocument(Base):
     error: Mapped[str | None] = mapped_column(Text)
     pages: Mapped[list] = mapped_column(JSONB, default=list)  # page text, index 0 = page 1
     page_info: Mapped[list] = mapped_column(JSONB, default=list)  # per page: text source, OCR engine/confidence
+    # Plain-language explanation per language (app/services/understanding.py): {"en": {...}, "hinglish": {...}}
+    understanding: Mapped[dict] = mapped_column(JSONB, default=dict)
     facts: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -143,4 +145,7 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String)  # user | assistant | tool
     message: Mapped[dict] = mapped_column(JSONB)
     display_text: Mapped[str | None] = mapped_column(Text)
+    # Assistant replies: the verified sources (documents/pages, judgments). User messages: @-mentioned document ids.
+    sources: Mapped[list] = mapped_column(JSONB, default=list)
+    mentions: Mapped[list] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

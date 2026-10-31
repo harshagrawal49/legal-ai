@@ -57,10 +57,25 @@ import com.nyaya.legal.data.uploadDocument
 import com.nyaya.legal.ui.Disclaimer
 import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.text
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.withStyle
+import com.nyaya.legal.data.ChatSource
+import com.nyaya.legal.data.DocumentSummary
 import kotlinx.coroutines.launch
 
 /** `notice` messages are app status lines (e.g. an attached document), not part of the conversation. */
-data class UiMessage(val fromUser: Boolean, val text: String, val notice: Boolean = false)
+data class UiMessage(
+    val fromUser: Boolean,
+    val text: String,
+    val notice: Boolean = false,
+    /** Assistant replies: verified sources. Null while streaming (nothing shown yet). */
+    val sources: List<ChatSource>? = null,
+    /** Attachment notices: the uploaded document, so the line can open it. */
+    val documentId: String? = null,
+)
+
+private val MENTION_QUERY = Regex("""@([^\s@]*)$""")
 
 class ChatViewModel(private val caseId: String) : ViewModel() {
     val messages = mutableStateListOf<UiMessage>()
@@ -106,7 +121,8 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
                         }
                         else -> doc.error ?: "It could not be processed."
                     }
-                    messages.add(UiMessage(fromUser = false, text = "Attached ${doc.filename}: $result", notice = true))
+                    messages.add(UiMessage(fromUser = false, text = "Attached ${doc.filename}: $result (tap to open)", notice = true, documentId = doc.id))
+                    documents = documents + DocumentSummary(id = doc.id, filename = doc.filename, status = doc.status)
                 }
                 .onFailure { error = Api.errorMessage(it) }
             uploading = false
@@ -118,12 +134,26 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
             runCatching {
                 caseTitle = Api.service.getCase(caseId).title
                 val history = Api.service.chatHistory(caseId)
-                messages.addAll(history.map { UiMessage(it.role == "user", it.displayText) })
+                messages.addAll(history.map { UiMessage(it.role == "user", it.displayText, sources = if (it.role == "user") null else it.sources) })
                 titles = Api.service.results(caseId).associate { it.judgment.id to it.judgment.title }
-                filenames = Api.service.documents(caseId).associate { it.id to it.filename }
+                documents = Api.service.documents(caseId)
+                filenames = documents.associate { it.id to it.filename }
             }.onFailure { error = "Could not load the conversation: ${it.message}" }
         }
     }
+
+    /** The case's documents, for @ suggestions. */
+    var documents by mutableStateOf<List<DocumentSummary>>(emptyList())
+        private set
+
+    /** Documents offered for the "@…" the user is typing at the end of the input. */
+    fun mentionSuggestions(input: String): List<DocumentSummary> {
+        val query = MENTION_QUERY.find(input)?.groupValues?.get(1) ?: return emptyList()
+        return documents.filter { it.filename.contains(query, ignoreCase = true) }.take(5)
+    }
+
+    /** Document ids whose "@filename" appears in the message. */
+    private fun mentionsIn(text: String) = documents.filter { "@${it.filename}" in text }.map { it.id }
 
     fun send(text: String) {
         messages.add(UiMessage(fromUser = true, text = text))
@@ -131,7 +161,7 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
         streaming = true
         error = null
         viewModelScope.launch {
-            Api.chat(caseId, text).collect { event ->
+            Api.chat(caseId, text, mentionsIn(text)).collect { event ->
                 when (event) {
                     is ChatEvent.Text -> {
                         val last = messages.last()
@@ -147,6 +177,12 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
                     is ChatEvent.Done -> {
                         status = null
                         unverified = unverified + event.unverified
+                        val last = messages.last()
+                        messages[messages.lastIndex] = last.copy(sources = event.sources)
+                        if (event.uncitedMentions.isNotEmpty()) {
+                            val names = event.uncitedMentions.mapNotNull { filenames[it] }.joinToString()
+                            messages.add(UiMessage(fromUser = false, text = "The answer didn't cite $names. Ask again if you expected it to.", notice = true))
+                        }
                     }
                     is ChatEvent.Error -> error = event.message
                 }
@@ -164,10 +200,16 @@ fun ChatScreen(
     onBack: () -> Unit,
     onOpenJudgment: (String) -> Unit,
     onOpenDocument: (String, Int?) -> Unit,
+    initialMention: String? = null,
 ) {
     val vm: ChatViewModel = viewModel { ChatViewModel(caseId) }
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
+    // Opened from "Ask about this document": start the message with @<that document>.
+    LaunchedEffect(vm.documents, initialMention) {
+        val doc = vm.documents.firstOrNull { it.id == initialMention }
+        if (doc != null && input.isEmpty()) input = "@${doc.filename} "
+    }
     val resolver = LocalContext.current.contentResolver
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { vm.attach(resolver, it) }
@@ -213,6 +255,22 @@ fun ChatScreen(
             }
             vm.error?.let { ErrorText(it) }
             if (vm.uploading) Text("Reading the document…", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp))
+            val suggestions = vm.mentionSuggestions(input)
+            if (suggestions.isNotEmpty()) {
+                Card(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                    Column {
+                        suggestions.forEach { doc ->
+                            Text(
+                                "@${doc.filename}" + (doc.documentType?.let { " · ${it.replace('_', ' ')}" } ?: ""),
+                                modifier = Modifier.fillMaxWidth().clickable { input = input.replace(MENTION_QUERY, "@${doc.filename} ") }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                            )
+                        }
+                    }
+                }
+            } else if (input.endsWith("@") && vm.documents.isEmpty()) {
+                Text("No documents in this case yet. Attach one with 📎.", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp))
+            }
             Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { picker.launch(UPLOAD_MIMES) }, enabled = !vm.uploading && !vm.streaming) {
                     Icon(Icons.Default.AttachFile, "Attach a PDF or photo")
@@ -220,7 +278,7 @@ fun ChatScreen(
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
-                    placeholder = { Text("Ask a question") },
+                    placeholder = { Text("Ask a question · type @ to refer to a document") },
                     modifier = Modifier.weight(1f),
                     maxLines = 5,
                 )
@@ -243,7 +301,12 @@ private fun MessageBubble(
     onOpenDocument: (String, Int?) -> Unit,
 ) {
     if (msg.notice) {
-        Text(msg.text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+        Text(
+            msg.text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = msg.documentId?.let { id -> Modifier.clickable { onOpenDocument(id, null) } } ?: Modifier,
+        )
         return
     }
     val colors = if (msg.fromUser) {
@@ -252,11 +315,51 @@ private fun MessageBubble(
         CardDefaults.cardColors()
     }
     Card(colors = colors, modifier = Modifier.fillMaxWidth(if (msg.fromUser) 0.85f else 1f)) {
+        Column(Modifier.padding(12.dp)) {
+            Text(if (msg.fromUser) withMentions(msg.text) else withCitationLinks(msg.text, titles, filenames, unverified, onOpenJudgment, onOpenDocument))
+            if (!msg.fromUser && msg.sources != null && msg.text.isNotBlank()) SourcesBlock(msg.sources, onOpenJudgment, onOpenDocument)
+        }
+    }
+}
+
+/** "Sources" under a reply: every document page and judgment it cited (verified by the backend). */
+@Composable
+private fun SourcesBlock(sources: List<ChatSource>, onOpenJudgment: (String) -> Unit, onOpenDocument: (String, Int?) -> Unit) {
+    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+    if (sources.isEmpty()) {
         Text(
-            if (msg.fromUser) AnnotatedString(msg.text) else withCitationLinks(msg.text, titles, filenames, unverified, onOpenJudgment, onOpenDocument),
-            modifier = Modifier.padding(12.dp),
+            "No sources cited: general information. Verify with an advocate.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    Text("Sources", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+    sources.forEach { s ->
+        val (label, open) = when (s.type) {
+            "document" -> "📄 ${s.filename ?: "document"}" + (s.page?.let { " · p.$it" } ?: "") to { s.documentId?.let { onOpenDocument(it, s.page) } }
+            else -> "⚖️ ${s.title ?: "Judgment"}" + (s.court?.let { " · $it" } ?: "") to { s.judgmentId?.let(onOpenJudgment) }
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { open() }.padding(vertical = 3.dp),
         )
     }
+}
+
+private val MENTION_TOKEN = Regex("""@\S+""")
+
+/** User messages: show "@receipt.pdf" references in bold. */
+private fun withMentions(text: String) = buildAnnotatedString {
+    var last = 0
+    for (m in MENTION_TOKEN.findAll(text)) {
+        append(text.substring(last, m.range.first))
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(m.value) }
+        last = m.range.last + 1
+    }
+    append(text.substring(last))
 }
 
 private val CITATION = Regex("""\[\[(?:J:([^\]]+)|D:([0-9a-f-]+):p(\d+))]]""")

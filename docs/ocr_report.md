@@ -1,5 +1,9 @@
 # OCR engine comparison: Tesseract vs PaddleOCR
 
+> **Scope update (2026-10-31):** documents are **English or Hindi**; Marathi is out of scope. The
+> comparison in §4.2 was run on a Devanagari set that included one Marathi page; §4.2b re-runs the
+> chosen engine on a **Hindi-only** set with `eng+hin`. The decision is unchanged.
+
 **Decision: Tesseract 5 is the default OCR engine** (`OCR_ENGINE=tesseract`). PaddleOCR stays as an
 optional extra for experiments. This report shows the measurements behind that decision.
 
@@ -10,11 +14,11 @@ Date: 2026-10-31 · Machine: Apple Silicon MacBook, 16 GB RAM, CPU only · Bench
 ## 1. Why we needed to choose
 
 Many property documents people hold are scans or phone photos (old sale deeds, receipts, 7/12
-extracts), often in **Marathi or Hindi**. The OCR engine has to:
+extracts), often in **Hindi**. The OCR engine has to:
 
 1. read **names, survey numbers, amounts and dates exactly**, because these feed the conflict flags
    (for example "survey no. 123/4 vs 123/A" or "₹5,00,000 vs ₹5,50,000");
-2. read **English and Devanagari** (Hindi, Marathi), including Devanagari numerals (१२३/४);
+2. read **English and Hindi (Devanagari)**, including Devanagari numerals (१२३/४);
 3. run **locally** on a 16 GB laptop, because property documents are private;
 4. be **fast enough** that a multi-page scan finishes while the user waits (target: a 10-page scan in about a minute).
 
@@ -22,7 +26,7 @@ extracts), often in **Marathi or Hindi**. The OCR engine has to:
 
 | Setup | Version / models | Languages |
 |---|---|---|
-| **Tesseract** | Tesseract 5.5.4 via `pytesseract` | `eng+hin+mar` in one pass |
+| **Tesseract** | Tesseract 5.5.4 via `pytesseract` | `eng+hin+mar` in one pass at the time (now `eng+hin`) |
 | **PaddleOCR default** | PaddleOCR 3.7.0, PaddlePaddle 3.3.1, PP-OCRv6 *medium* det + rec | `en` |
 | **PaddleOCR mobile** | PP-OCRv5 *mobile* det + rec (lighter) | Chinese/English model |
 | **PaddleOCR Devanagari** | PP-OCRv5 server det + `devanagari_PP-OCRv5_mobile_rec` | `mr` (Devanagari) |
@@ -72,7 +76,7 @@ run was interrupted before its JSON was written, so the console output is the re
 | PaddleOCR default | degraded | **57%** | **5.2%** | **11.8%** | 25.9 | 84 |
 | PaddleOCR mobile | degraded | 36% | 7.4% | 32.0% | 6.1 | 91 |
 
-### 4.2 Devanagari documents: Marathi + Hindi (2 pages)
+### 4.2 Devanagari documents (2 pages: one Hindi, one Marathi; measured before Marathi was dropped)
 
 | Engine | Quality | Key values | CER | WER | s/page | conf |
 |---|---|---|---|---|---|---|
@@ -91,6 +95,18 @@ run was interrupted before its JSON was written, so the console output is the re
 
 PaddleOCR's `en` and mobile models can't read Devanagari at all. Their 30% comes only from the
 ASCII-numeral values (`123/4`, `45,00,000`) in the Hindi document.
+
+### 4.2b Hindi only, current setup (Tesseract `eng+hin`, 2026-10-31)
+
+A Hindi receipt with Devanagari numerals + a Hindi agreement extract with ASCII numerals (2 pages).
+
+| Quality | Key values | CER | WER | s/page | conf |
+|---|---|---|---|---|---|
+| clean | **100%** | 1.4% | 3.6% | 0.5 | 93 |
+| photo | **100%** | 1.0% | 1.8% | 0.5 | 92 |
+| degraded | 40% | 34.6% | 48.2% | 1.0 | 73 |
+
+Raw results: `backend/eval/results/ocr-20261031-173810.json`.
 
 ### 4.3 Resources
 
@@ -141,8 +157,8 @@ pass (~1 s). Final measured effect: degraded key values went from 36% to 50% (En
 |---|---|---|---|---|
 | English, clean/photo | ✅ best or equal | ✅ equal | ✅ equal or better on clean | n/a |
 | English, degraded | ⚠️ 50% key values | ✅ **57%**, best | ❌ 36% | n/a |
-| Marathi/Hindi | ✅ **100%** clean/photo | ❌ can't read Devanagari | ❌ can't read Devanagari | ⚠️ 70% on clean |
-| Mixed English + Devanagari on one page | ✅ one pass (`eng+hin+mar`) | ❌ one language per model | ❌ | ❌ Devanagari only |
+| Hindi (Devanagari) | ✅ **100%** clean/photo | ❌ can't read Devanagari | ❌ can't read Devanagari | ⚠️ 70% on clean |
+| Mixed English + Devanagari on one page | ✅ one pass (`eng+hin`) | ❌ one language per model | ❌ | ❌ Devanagari only |
 | Speed (s/page) | ✅ **0.5–2** | ❌ ~26 | ⚠️ ~6 | ❌ ~78 |
 | Peak memory | ✅ **~0.1 GB** | ❌ **~15 GB** | ❌ ~4.3 GB | not measured |
 | Install | ✅ `brew install`, small | ❌ large framework + model downloads | ❌ same | ❌ same |
@@ -153,7 +169,7 @@ pass (~1 s). Final measured effect: degraded key values went from 36% to 50% (En
 **Tesseract is the right default for NyayaSathi.**
 
 1. **It reads the documents our users actually have.** It got 100% of key values on clean and
-   photo-quality Marathi and Hindi scans, including Devanagari numerals, in a single pass that also
+   photo-quality Hindi scans, including Devanagari numerals, in a single pass that also
    reads English. PaddleOCR needs a different model per language, and its Devanagari model was
    both less accurate (70%) and about 100× slower.
 2. **It is about 40× faster** (0.5–2 s per page against ~26 s). A 10-page scan takes seconds, not minutes.
@@ -183,7 +199,7 @@ benchmark can re-check that case.
 1. **Real-document check:** run the pipeline on 5–10 real (permissioned) photographed documents and
    compare key values by hand.
 2. **Detect garbled text layers:** some Indian PDFs have a Devanagari text layer that extracts as
-   garbled characters. We saw this when generating the Marathi samples. Pages whose text is mostly
+   garbled characters. We saw this when generating the Devanagari samples. Pages whose text is mostly
    unexpected Latin-extended characters should be sent to OCR instead of being trusted as typed text.
 3. **Deskew** before OCR for rotated photos (Tesseract's orientation detection or a Hough-line deskew),
    then re-run this benchmark.
