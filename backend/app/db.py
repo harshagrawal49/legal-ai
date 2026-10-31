@@ -20,6 +20,9 @@ def init_db() -> None:
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine)
+    # create_all doesn't add columns to existing tables; small additive changes until Alembic is set up.
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE case_documents ADD COLUMN IF NOT EXISTS page_info JSONB DEFAULT '[]'::jsonb"))
 
 
 def get_db() -> Iterator[Session]:

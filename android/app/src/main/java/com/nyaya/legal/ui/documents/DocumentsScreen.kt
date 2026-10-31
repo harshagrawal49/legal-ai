@@ -49,10 +49,10 @@ import com.nyaya.legal.data.Api
 import com.nyaya.legal.data.DocumentSummary
 import com.nyaya.legal.data.Evidence
 import com.nyaya.legal.data.Flag
-import com.nyaya.legal.data.PDF_MIME
+import com.nyaya.legal.data.UPLOAD_MIMES
 import com.nyaya.legal.data.SourceRef
 import com.nyaya.legal.data.TimelineItem
-import com.nyaya.legal.data.uploadPdf
+import com.nyaya.legal.data.uploadDocument
 import com.nyaya.legal.ui.ErrorText
 import com.nyaya.legal.ui.Loading
 import kotlinx.coroutines.Job
@@ -108,7 +108,7 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
     }
 
     fun upload(resolver: ContentResolver, uri: Uri) = run("Uploading…") {
-        uploadPdf(resolver, caseId, uri)
+        uploadDocument(resolver, caseId, uri)
     }
 
     fun retry(docId: String) = run("Extracting facts again…") { Api.service.retryExtraction(caseId, docId) }
@@ -121,7 +121,7 @@ class DocumentsViewModel(private val caseId: String) : ViewModel() {
 fun DocumentsScreen(caseId: String, onBack: () -> Unit, onOpenDocument: (String, Int?) -> Unit, onBrief: () -> Unit) {
     val vm: DocumentsViewModel = viewModel { DocumentsViewModel(caseId) }
     val resolver = LocalContext.current.contentResolver
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { vm.upload(resolver, it) }
     }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -137,9 +137,9 @@ fun DocumentsScreen(caseId: String, onBack: () -> Unit, onOpenDocument: (String,
         floatingActionButton = {
             if (vm.busy == null) {
                 ExtendedFloatingActionButton(
-                    onClick = { picker.launch(PDF_MIME) },
+                    onClick = { picker.launch(UPLOAD_MIMES) },
                     icon = { Icon(Icons.Default.UploadFile, null) },
-                    text = { Text("Upload PDF") },
+                    text = { Text("Upload PDF or photo") },
                 )
             }
         },
@@ -176,7 +176,7 @@ private fun DocumentList(
     if (docs.isEmpty()) {
         Text(
             "No documents yet. Upload a text-based PDF such as an agreement to sell, a receipt or a notice. " +
-                "Scanned images are not supported yet.",
+                "Scans and phone photos (JPG/PNG) are read with OCR; check the extracted details against the original.",
             Modifier.padding(16.dp),
         )
         return
@@ -189,7 +189,12 @@ private fun DocumentList(
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text(doc.filename, style = MaterialTheme.typography.titleSmall)
                         Text(
-                            listOfNotNull(doc.documentType?.let(::humanise), "${doc.pageCount} pages", statusLabel(doc.status))
+                            listOfNotNull(
+                                doc.documentType?.let(::humanise),
+                                "${doc.pageCount} pages",
+                                if (doc.ocrPages > 0) "${doc.ocrPages} read by OCR" else null,
+                                statusLabel(doc.status),
+                            )
                                 .joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -242,7 +247,7 @@ fun SourceLink(ref: SourceRef, onOpenSource: (String, Int?) -> Unit) {
         ref.page == null -> ""
         ref.verified -> " · quote found on page"
         else -> " · quote NOT found on page, check the original"
-    }
+    } + if (ref.fromOcr) " · read by OCR, check digits and names" else ""
     Text(
         (ref.value?.let { "$it: " } ?: "") + where + check,
         style = MaterialTheme.typography.labelSmall,
@@ -270,7 +275,7 @@ fun SectionTitle(text: String) {
 fun humanise(value: String) = value.replace('_', ' ').replaceFirstChar { it.uppercase() }
 
 private fun statusLabel(status: String) = when (status) {
-    "processing" -> "Extracting facts…"
+    "processing" -> "Reading and extracting facts…"
     "processed" -> "Processed"
     "text_only" -> "Text only"
     else -> "Not readable"

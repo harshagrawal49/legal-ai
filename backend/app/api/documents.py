@@ -20,12 +20,13 @@ def _summary(doc: CaseDocument) -> dict:
         "error": doc.error,
         "document_type": doc.facts.get("document_type") if doc.facts else None,
         "page_count": len(doc.pages or []),
+        "ocr_pages": sum(1 for p in doc.page_info or [] if p.get("source") == "ocr"),
         "created_at": doc.created_at,
     }
 
 
 def _detail(doc: CaseDocument) -> dict:
-    return {**_summary(doc), "pages": doc.pages or [], "facts": doc.facts or {}}
+    return {**_summary(doc), "pages": doc.pages or [], "page_info": doc.page_info or [], "facts": doc.facts or {}}
 
 
 def _get_document(case: Case, document_id: uuid.UUID) -> CaseDocument:
@@ -37,20 +38,23 @@ def _get_document(case: Case, document_id: uuid.UUID) -> CaseDocument:
 
 @router.post("/documents", response_model=DocumentOut, status_code=201)
 async def upload_document(file: UploadFile, case: UserCase, db: DB, background: BackgroundTasks):
-    """Upload a PDF. Text is extracted page by page straight away; candidate facts with page references
-    are extracted in the background (status `processing` until done; poll the document).
+    """Upload a PDF, or a JPG/PNG photo. Selectable text is read page by page straight away; scanned
+    pages are OCR'd and candidate facts with page references extracted in the background (status
+    `processing` until done; poll the document).
 
     Unusable PDFs (scanned, encrypted, damaged) are stored with status `failed` and the reason, so they
     appear in the brief. Non-PDFs and oversized files are rejected and not stored.
     """
     data = await file.read(documents.MAX_UPLOAD_BYTES + 1)
     try:
-        doc = documents.add_document(case, file.filename or "document.pdf", data)
+        pdf = documents.prepare_upload(data)  # photos become a one-page PDF
+        doc = documents.add_document(case, file.filename or "document.pdf", pdf)
     except documents.DocumentError as e:
         raise HTTPException(ERROR_STATUS.get(e.code, 422), e.message)
     db.commit()
     if doc.status == "processing":
-        background.add_task(documents.extract_in_background, doc.id)
+        # The PDF goes to the background task in memory only (for OCR); it is never stored.
+        background.add_task(documents.extract_in_background, doc.id, pdf if documents.needs_ocr(doc) else None)
     return _detail(doc)
 
 

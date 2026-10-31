@@ -392,7 +392,13 @@ project/
   memo, background fact extraction with polling, smaller search prompt, at most 3 chat tool rounds,
   per-call timing logs. Android: attach PDFs on the first intake step, case home after search,
   feature intro on the empty case list. 42 tests pass.
-- **Remaining**: compile and test the Android build; run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
+- **OCR** (`ocr_plan.md`, `docs/ocr_steps.md`): scanned PDFs and JPG/PNG photos are read by
+  Tesseract (default) or PaddleOCR (optional extra), behind one engine interface. OCR runs in the
+  background; per-page source/engine/confidence is stored in `page_info`; `ocr_used`,
+  `ocr_low_confidence` and `ocr_page_not_read` flags; `from_ocr` on every source. Engine benchmark
+  in `eval/run_ocr_eval.py` (English + Marathi/Hindi). Decision: **Tesseract** (`docs/ocr_report.md`),
+  plus an adaptive denoise retry for low-confidence pages.
+- **Remaining**: compile and test the Android build;  run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
   plus representative errors in `docs/evaluation.md`; add a retrieval eval with fixed questions.
 
 ## 12. First action

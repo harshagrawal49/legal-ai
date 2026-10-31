@@ -67,7 +67,7 @@ def test_timeline_is_chronological_with_undated_last_and_sourced():
     assert timeline[-1]["description"] == "Possession on registration"
     assert all(t["source"]["document_id"] for t in timeline)
     assert timeline[2]["source"] == {"document_id": str(AGREEMENT.id), "filename": "agreement.pdf", "page": 2,
-                                    "excerpt": "x", "verified": True}
+                                    "excerpt": "x", "verified": True, "from_ocr": False}
 
 
 def test_flags_identifier_and_amount_differences_across_documents():
@@ -139,3 +139,20 @@ def test_brief_separates_sections_and_falls_back_without_llm(monkeypatch):
     assert out["legal_sources"] == []
     assert out["suggestions_ai_generated"] is False
     assert out["advocate_questions"] and out["checklist"]
+
+
+def test_ocr_comma_read_as_dot_is_still_the_same_amount():
+    # Seen in the OCR benchmark (PaddleOCR, degraded scan): "Rs. 5,50,000/-" read as "Rs. 5.50,000/-".
+    assert parse_amount("Rs. 5.50,000/-") == parse_amount("Rs. 5,50,000/-") == Decimal(550000)
+    assert parse_amount("Rs 4.5 lakh") == Decimal(450000)  # a real decimal point is unaffected
+    assert parse_amount("Rs. 1,25.50") == Decimal("125.50")
+
+
+def test_devanagari_identifiers_are_compared_not_erased():
+    from app.services.evidence import _norm_id
+
+    # Before the fix both became "" and a real difference between Marathi survey numbers was invisible.
+    assert _norm_id("१२३/अ") == "123अ" and _norm_id("१२३/४") == "1234"
+    assert _norm_id("सर्वे क्र. १२३/४") != _norm_id("सर्वे क्र. १२३/अ")
+    assert _norm_id("१२३ / ४") == _norm_id("123/4")  # same number in either script
+    assert parse_amount("रुपये ५,००,०००") == Decimal(500000)

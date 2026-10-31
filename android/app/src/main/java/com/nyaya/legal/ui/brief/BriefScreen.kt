@@ -113,6 +113,7 @@ private fun BriefContent(brief: Brief, onOpenDocument: (String, Int?) -> Unit, o
         items(brief.documents) { d ->
             Text(
                 "${d.filename}: ${d.documentType?.let(::humanise) ?: "unknown type"}, ${d.pageCount} pages, ${d.status}" +
+                    (if (d.ocrPages > 0) ", ${d.ocrPages} scanned page(s) read by OCR" + (d.ocrConfidence?.let { " (avg ${it.toInt()}%)" } ?: "") else "") +
                     (d.error?.let { " ($it)" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.clickable(enabled = d.pageCount > 0) { onOpenDocument(d.documentId, null) },

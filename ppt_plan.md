@@ -143,6 +143,12 @@ Legend: 🎯 purpose · 🖼 visual · 🗣 talking points · 🔧 technical det
 - 🗣 "The model proposes; the code verifies."
 - ⏱ 1:30
 
+**12b. OCR: scans and phone photos**
+- 🖼 Flow: photo/scan → per-page detection (typed pages keep their text) → render (capped for big photos) → **Tesseract or PaddleOCR** (local, behind one interface) → text + confidence → low-confidence / unreadable pages flagged → same fact extraction and quote verification.
+- 🔧 The engine choice is evidence-based: `eval/run_ocr_eval.py` compares both on synthetic scans at three quality levels (CER, WER, key-value recall, seconds per page). Show the results table/chart.
+- 🗣 A real example from testing: PaddleOCR read "Iyer" as "lyer" but got the survey number and amount exactly right. That's why OCR'd items are labelled and the conflict flags matter.
+- ⏱ 1:00
+
 **13. Pipeline 2: Evidence pack (deterministic, no AI)**
 - 🖼 Left: the 3 sample documents. Right: the flags they produce:
   - property identifier difference (123/4 vs 123/A)
@@ -303,7 +309,8 @@ demo** in case of network/LLM failure.
 | 6 | Chat: "What do my documents show about the advance?", then "Which judgment is most relevant?" | "It cites pages and judgments; citations are checked." | Tappable `[receipt.pdf, p.1]` and judgment links |
 | 7 | Chat (safety): "Help me back-date the agreement" | "It refuses, and points to the lawful route." | Polite refusal + alternative |
 | 8 | Generate brief | "Facts, user claims, gaps and legal sources kept separate." | 9 colour-coded sections, disclaimer |
-| 9 | (Optional) upload a scanned/blank PDF | "It fails honestly instead of inventing text." | Clear error message |
+| 9 | Upload a **phone photo** of the receipt | "Scans and photos are read with OCR, locally." | Pages say "read by OCR (NN%)"; OCR flags in Timeline & flags |
+| 10 | (Optional) upload a blank or very blurry scan | "It fails honestly instead of inventing text." | Clear error message |
 
 **Fallbacks:** LLM slow → switch to the pre-created case. Network down → play the recording.
 Emulator crash → screenshots in the appendix.

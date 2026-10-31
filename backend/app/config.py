@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384
 
+    # OCR for scanned pages and photos (app/services/ocr.py, docs/ocr_steps.md).
+    ocr_enabled: bool = True
+    ocr_engine: str = "tesseract"  # tesseract | paddle | auto (chosen by benchmark: docs/ocr_report.md)
+    ocr_languages: str = "eng+hin+mar"  # Tesseract language packs
+    ocr_paddle_lang: str = "en"  # PaddleOCR recognition language: en, or hi / mr for Devanagari
+    ocr_paddle_model: str = "default"  # default (PP-OCRv6 medium) | mobile (PP-OCRv5 mobile, faster) | devanagari
+    ocr_dpi: int = 300
+    ocr_max_pages: int = 30
+    ocr_min_confidence: float = 60  # pages below this get an "ocr_low_confidence" flag
+    ocr_retry_below_confidence: float = 85  # Tesseract retries with a denoise filter below this
+    ocr_page_timeout_seconds: int = 60
+
     # How many candidate judgments go to the LLM for relevance analysis, and how many are kept.
     search_candidates: int = 8
     search_results: int = 5

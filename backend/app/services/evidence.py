@@ -8,6 +8,7 @@ wording never draws a conclusion (fraud, ownership, liability) from it.
 import re
 from decimal import Decimal, InvalidOperation
 
+from app.config import get_settings
 from app.models import CaseDocument
 
 # Amount and event kinds where one case normally has a single value, so differences are worth a look.
@@ -15,6 +16,12 @@ SINGLE_VALUE_AMOUNTS = {"total_consideration", "advance_or_earnest_money"}
 SINGLE_DATE_EVENTS = {"agreement_signed", "registration", "deadline"}
 MULTIPLIERS = {"lakh": Decimal(100_000), "lakhs": Decimal(100_000), "lac": Decimal(100_000),
                "crore": Decimal(10_000_000), "crores": Decimal(10_000_000)}
+
+
+def page_source(doc: CaseDocument, page: int | None) -> dict:
+    """page_info entry for a 1-based page number ({} if unknown)."""
+    info = doc.page_info or []
+    return info[page - 1] if page and 1 <= page <= len(info) else {}
 
 
 def source_ref(doc: CaseDocument, source: dict | None) -> dict:
@@ -25,16 +32,68 @@ def source_ref(doc: CaseDocument, source: dict | None) -> dict:
         "page": source.get("page"),
         "excerpt": source.get("excerpt"),
         "verified": bool(source.get("verified")),
+        # A matching quote proves where the text came from, not that OCR read the digits correctly.
+        "from_ocr": page_source(doc, source.get("page")).get("source") == "ocr",
     }
+
+
+def _pages_text(numbers: list[int]) -> str:
+    return ("page " if len(numbers) == 1 else "pages ") + ", ".join(map(str, numbers))
+
+
+def ocr_flags(doc: CaseDocument, min_confidence: float) -> list[dict]:
+    """What OCR did to this document's pages, in plain words, each linked to the pages concerned."""
+    by_source: dict[str, list[int]] = {}
+    low: list[tuple[int, float]] = []
+    for n, info in enumerate(doc.page_info or [], start=1):
+        by_source.setdefault(info.get("source", "text"), []).append(n)
+        if info.get("source") == "ocr" and info.get("confidence") is not None and info["confidence"] < min_confidence:
+            low.append((n, info["confidence"]))
+
+    def refs(numbers):
+        return [source_ref(doc, {"page": n}) for n in numbers]
+
+    flags = []
+    if by_source.get("ocr"):
+        engine = next(i.get("engine") for i in doc.page_info if i.get("source") == "ocr")
+        flags.append(_flag(
+            "ocr_used",
+            f"{doc.filename}: {_pages_text(by_source['ocr'])} read from a scan (OCR, {engine}). "
+            "Check amounts, dates, names and survey numbers against the original.",
+            refs(by_source["ocr"]),
+        ))
+    for n, confidence in low:
+        flags.append(_flag(
+            "ocr_low_confidence",
+            f"{doc.filename}: page {n} was read by OCR with low confidence ({confidence:.0f}%). "
+            "Some words or numbers may be wrong; compare it with the original carefully.",
+            refs([n]),
+        ))
+    messages = {
+        "ocr_unreadable": "could not be read (the scan is too unclear)",
+        "ocr_failed": "could not be read (OCR failed on this page)",
+        "ocr_unavailable": "are scanned but OCR isn't available on this server" if len(by_source.get("ocr_unavailable", [])) > 1
+        else "is scanned but OCR isn't available on this server",
+        "ocr_skipped": "were not read: only the first pages of a long scan are OCR'd",
+    }
+    for source, message in messages.items():
+        if by_source.get(source):
+            flags.append(_flag("ocr_page_not_read", f"{doc.filename}: {_pages_text(by_source[source])} {message}.", refs(by_source[source])))
+    return flags
 
 
 def _processed(docs: list[CaseDocument]) -> list[CaseDocument]:
     return [d for d in docs if d.status == "processed" and d.facts]
 
 
+OCR_GROUPING_DOT = re.compile(r"(?<=\d)\.(?=\d{2,3},)")
+
+
 def parse_amount(value: str) -> Decimal | None:
     """'Rs. 5,00,000/-' -> 500000, 'Rs 4.5 lakh' -> 450000. None if there is no single clear number."""
-    text = value.lower().replace(",", "")
+    # OCR often reads a grouping comma as a dot ("5.50,000"). A dot followed by digits and then a
+    # comma can't be a decimal point, so treat it as a comma.
+    text = OCR_GROUPING_DOT.sub(",", value.lower()).replace(",", "")
     numbers = re.findall(r"\d+(?:\.\d+)?", text)
     if len(numbers) != 1:
         return None
@@ -48,8 +107,12 @@ def parse_amount(value: str) -> Decimal | None:
     return amount
 
 
+DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
+
+
 def _norm_id(value: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", value.lower())
+    """'123 / 4' -> '1234'; Devanagari is kept, and its digits become ASCII ('१२३/अ' -> '123अ')."""
+    return re.sub(r"[^a-z0-9\u0900-\u097f]", "", value.lower().translate(DEVANAGARI_DIGITS))
 
 
 # ---------- Chronology ----------
@@ -100,7 +163,10 @@ def build_flags(docs: list[CaseDocument]) -> list[dict]:
     flags: list[dict] = []
     processed = _processed(docs)
 
+    min_confidence = get_settings().ocr_min_confidence
     for doc in docs:
+        if doc.page_info:
+            flags += ocr_flags(doc, min_confidence)
         if doc.status == "processing":
             flags.append(_flag("still_processing", f"{doc.filename}: still being analysed. Refresh in a moment.", [source_ref(doc, None)]))
         elif doc.status != "processed":

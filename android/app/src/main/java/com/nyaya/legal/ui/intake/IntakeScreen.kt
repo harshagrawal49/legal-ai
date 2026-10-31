@@ -52,8 +52,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
-import com.nyaya.legal.data.PDF_MIME
-import com.nyaya.legal.data.uploadPdf
+import com.nyaya.legal.data.UPLOAD_MIMES
+import com.nyaya.legal.data.uploadDocument
 import kotlinx.coroutines.launch
 
 class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
@@ -77,7 +77,7 @@ class IntakeViewModel(private val existingCaseId: String?) : ViewModel() {
         val failed = mutableListOf<String>()
         pendingFiles.forEachIndexed { i, (uri, name) ->
             busy = "Uploading documents (${i + 1}/${pendingFiles.size})…"
-            runCatching { uploadPdf(resolver, created.id, uri) }.onFailure { failed += "$name: ${Api.errorMessage(it)}" }
+            runCatching { uploadDocument(resolver, created.id, uri) }.onFailure { failed += "$name: ${Api.errorMessage(it)}" }
         }
         pendingFiles.clear()
         if (failed.isNotEmpty()) error = "Some documents were not uploaded:\n" + failed.joinToString("\n")
@@ -143,7 +143,7 @@ fun IntakeScreen(caseId: String?, onBack: () -> Unit, onResults: (String) -> Uni
 private fun DescribeStep(files: MutableList<Pair<Uri, String>>, onSubmit: (String) -> Unit) {
     var text by rememberSaveableText()
     val resolver = LocalContext.current.contentResolver
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         uris.filter { u -> files.none { it.first == u } }.forEach { files += it to displayName(resolver, it) }
     }
     Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -158,7 +158,7 @@ private fun DescribeStep(files: MutableList<Pair<Uri, String>>, onSubmit: (Strin
 
         Text("Documents (optional)", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Agreement to sell, receipts, notices, property records (text-based PDF, up to 10 MB each).",
+            "Agreement to sell, receipts, notices, property records: PDF, or a photo (JPG/PNG), up to 10 MB each. Scans and photos are read with OCR.",
             style = MaterialTheme.typography.bodySmall,
         )
         files.forEach { (uri, name) ->
@@ -168,7 +168,7 @@ private fun DescribeStep(files: MutableList<Pair<Uri, String>>, onSubmit: (Strin
                 IconButton(onClick = { files.removeAll { it.first == uri } }) { Icon(Icons.Default.Close, "Remove $name") }
             }
         }
-        OutlinedButton(onClick = { picker.launch(PDF_MIME) }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { picker.launch(UPLOAD_MIMES) }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.AttachFile, null)
             Text(if (files.isEmpty()) "Attach documents" else "Attach more", Modifier.padding(start = 8.dp))
         }

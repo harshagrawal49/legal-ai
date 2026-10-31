@@ -104,6 +104,7 @@ class CaseDocument(Base):
     status: Mapped[str] = mapped_column(String)
     error: Mapped[str | None] = mapped_column(Text)
     pages: Mapped[list] = mapped_column(JSONB, default=list)  # page text, index 0 = page 1
+    page_info: Mapped[list] = mapped_column(JSONB, default=list)  # per page: text source, OCR engine/confidence
     facts: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

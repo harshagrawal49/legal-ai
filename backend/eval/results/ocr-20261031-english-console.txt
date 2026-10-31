@@ -1,0 +1,20 @@
+set         engine             quality       CER     WER  key values  s/page   conf
+english     tesseract          clean        0.2%    1.5%         79%     0.6     95
+                                       missed: Meera Iyer
+english     tesseract          photo        0.3%    2.0%         79%     0.6     95
+                                       missed: Meera Iyer
+english     tesseract          degraded    41.9%   60.8%         36%     0.8     65
+                                       missed: 123/4, 40,00,000, 5,50,000, Meera Iyer, Ravi Kulkarni
+english     paddle-default     clean        0.3%    2.3%         79%    27.3    100
+                                       missed: Meera Iyer
+english     paddle-default     photo        2.3%    4.4%         79%    26.5     99
+                                       missed: Meera Iyer
+english     paddle-default     degraded     5.2%   11.8%         57%    25.9     84
+                                       missed: 5,50,000, Meera Iyer, Ravi Kulkarni
+english     paddle-mobile      clean        0.3%    2.4%         86%     7.1     97
+                                       missed: Meera Iyer
+english     paddle-mobile      photo        3.0%   12.1%         79%     6.5     96
+                                       missed: Meera Iyer
+english     paddle-mobile      degraded     7.4%   32.0%         36%     6.1     91
+                                       missed: 40,00,000, 45,00,000, 5,00,000, 5,50,000, Meera Iyer, Ravi Kulkarni
+

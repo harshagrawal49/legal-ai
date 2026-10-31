@@ -52,10 +52,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nyaya.legal.data.Api
 import com.nyaya.legal.data.ChatEvent
-import com.nyaya.legal.data.PDF_MIME
-import com.nyaya.legal.data.uploadPdf
+import com.nyaya.legal.data.UPLOAD_MIMES
+import com.nyaya.legal.data.uploadDocument
 import com.nyaya.legal.ui.Disclaimer
 import com.nyaya.legal.ui.ErrorText
+import com.nyaya.legal.ui.text
 import kotlinx.coroutines.launch
 
 /** `notice` messages are app status lines (e.g. an attached document), not part of the conversation. */
@@ -93,12 +94,16 @@ class ChatViewModel(private val caseId: String) : ViewModel() {
         uploading = true
         error = null
         viewModelScope.launch {
-            runCatching { uploadPdf(resolver, caseId, uri) }
+            runCatching { uploadDocument(resolver, caseId, uri) }
                 .onSuccess { doc ->
                     filenames = filenames + (doc.id to doc.filename)
                     val result = when (doc.status) {
                         "processed" -> "${doc.pageCount} pages read. You can now ask about it."
-                        "processing" -> "${doc.pageCount} pages read. Facts are being extracted; you can already ask about it."
+                        "processing" -> if (doc.pageInfo.any { it.text("source") == "ocr_pending" }) {
+                            "Reading the scan (OCR), then extracting facts. This can take a minute."
+                        } else {
+                            "${doc.pageCount} pages read. Facts are being extracted; you can already ask about it."
+                        }
                         else -> doc.error ?: "It could not be processed."
                     }
                     messages.add(UiMessage(fromUser = false, text = "Attached ${doc.filename}: $result", notice = true))
@@ -164,7 +169,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
     val resolver = LocalContext.current.contentResolver
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { vm.attach(resolver, it) }
     }
 
@@ -209,8 +214,8 @@ fun ChatScreen(
             vm.error?.let { ErrorText(it) }
             if (vm.uploading) Text("Reading the document…", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp))
             Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { picker.launch(PDF_MIME) }, enabled = !vm.uploading && !vm.streaming) {
-                    Icon(Icons.Default.AttachFile, "Attach a PDF")
+                IconButton(onClick = { picker.launch(UPLOAD_MIMES) }, enabled = !vm.uploading && !vm.streaming) {
+                    Icon(Icons.Default.AttachFile, "Attach a PDF or photo")
                 }
                 OutlinedTextField(
                     value = input,

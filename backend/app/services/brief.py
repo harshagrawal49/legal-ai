@@ -36,9 +36,18 @@ def _document_status(docs: list[CaseDocument]) -> list[dict]:
             "document_type": d.facts.get("document_type") if d.facts else None,
             "page_count": len(d.pages or []),
             "error": d.error,
+            **_ocr_summary(d),
         }
         for d in docs
     ]
+
+
+def _ocr_summary(doc: CaseDocument) -> dict:
+    confidences = [p["confidence"] for p in doc.page_info or [] if p.get("source") == "ocr" and p.get("confidence") is not None]
+    return {
+        "ocr_pages": sum(1 for p in doc.page_info or [] if p.get("source") == "ocr"),
+        "ocr_confidence": round(sum(confidences) / len(confidences), 1) if confidences else None,
+    }
 
 
 def _supported_facts(docs: list[CaseDocument]) -> list[dict]:
@@ -91,9 +100,12 @@ def _legal_sources(case: Case) -> list[dict]:
 def _fallback_suggestions(flags: list[dict]) -> BriefSuggestions:
     questions = [
         f"How should this be addressed: {f['message']}"
-        for f in flags if f["kind"] not in ("extraction_failure", "still_processing")
+        for f in flags if f["kind"] not in ("extraction_failure", "still_processing", "ocr_used", "ocr_page_not_read")
     ]
-    checklist = [f"Re-upload or obtain a readable copy: {f['message']}" for f in flags if f["kind"] == "extraction_failure"]
+    checklist = [
+        f"Re-upload or obtain a readable copy: {f['message']}"
+        for f in flags if f["kind"] in ("extraction_failure", "ocr_page_not_read")
+    ]
     return BriefSuggestions(advocate_questions=questions[:8], checklist=checklist[:8])
 
 

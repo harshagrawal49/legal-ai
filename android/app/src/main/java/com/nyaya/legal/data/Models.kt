@@ -122,6 +122,7 @@ data class DocumentSummary(
     val error: String? = null,
     @SerialName("document_type") val documentType: String? = null,
     @SerialName("page_count") val pageCount: Int = 0,
+    @SerialName("ocr_pages") val ocrPages: Int = 0,
 )
 
 @Serializable
@@ -132,7 +133,10 @@ data class DocumentDetail(
     val error: String? = null,
     @SerialName("document_type") val documentType: String? = null,
     @SerialName("page_count") val pageCount: Int = 0,
+    @SerialName("ocr_pages") val ocrPages: Int = 0,
     val pages: List<String> = emptyList(),
+    /** Per page: {"source": "text" | "ocr" | "ocr_unreadable" | ..., "engine", "confidence"}. */
+    @SerialName("page_info") val pageInfo: List<JsonObject> = emptyList(),
     val facts: JsonObject = JsonObject(emptyMap()), // backend/app/llm/schemas.py: DocumentFacts
 )
 
@@ -143,6 +147,7 @@ data class SourceRef(
     val page: Int? = null,
     val excerpt: String? = null,
     val verified: Boolean = false,
+    @SerialName("from_ocr") val fromOcr: Boolean = false,
     val value: String? = null,
 )
 
@@ -198,4 +203,6 @@ data class BriefDocument(
     @SerialName("document_type") val documentType: String? = null,
     @SerialName("page_count") val pageCount: Int = 0,
     val error: String? = null,
+    @SerialName("ocr_pages") val ocrPages: Int = 0,
+    @SerialName("ocr_confidence") val ocrConfidence: Double? = null,
 )

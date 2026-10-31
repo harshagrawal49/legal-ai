@@ -94,6 +94,20 @@ uv run python -c "from eval.samples import SAMPLES, make_pdf; [open(f'/tmp/{n}',
 `http://10.0.2.2:8000/`, which is your machine as seen from the emulator. From the command line,
 run `cd android && ./gradlew assembleDebug`.
 
+## OCR (scanned PDFs and photos)
+
+Scanned pages and JPG/PNG photos are read locally with **Tesseract** (default, chosen by benchmark:
+[`docs/ocr_report.md`](docs/ocr_report.md)) or **PaddleOCR** (optional), set by `OCR_ENGINE`. OCR runs in the
+background; OCR'd pages are labelled with their confidence, and low-confidence or unreadable pages
+are flagged. The file itself is never stored.
+
+```bash
+brew install tesseract tesseract-lang     # or: apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-mar
+cd backend && uv sync --extra paddle      # optional second engine
+uv run python -m eval.run_ocr_eval        # compare the installed engines
+```
+Full reference: [`docs/ocr_steps.md`](docs/ocr_steps.md). Design: [`ocr_plan.md`](ocr_plan.md).
+
 ## Speed (Gemini free tier)
 
 - **Two model tiers**: `MODEL_FAST` (flash-lite) for intake, document extraction and the brief;
@@ -145,7 +159,7 @@ works by changing `LLM_BASE_URL`, `LLM_API_KEY` and the model names in `.env`:
 | GET | `/cases/{id}/results` | Saved results |
 | GET/POST | `/cases/{id}/chat` | History / send a message (SSE stream) |
 | GET | `/judgments/{id}` | Judgment summary and full paragraphs |
-| POST | `/cases/{id}/documents` | Upload a PDF (multipart `file`) → page text + extracted facts (415 non-PDF, 413 too large) |
+| POST | `/cases/{id}/documents` | Upload a PDF or JPG/PNG photo (multipart `file`) → page text; OCR + facts in the background (415 unsupported type, 413 too large) |
 | GET | `/cases/{id}/documents` | Uploaded documents and their status |
 | GET/DELETE | `/cases/{id}/documents/{doc_id}` | Page text and facts / delete document and its data |
 | POST | `/cases/{id}/documents/{doc_id}/extract` | Retry fact extraction |
@@ -160,7 +174,7 @@ source-linked fact extraction, evidence pack, document-aware chat and case-prepa
 Android screens (My documents, document review, brief). Baseline evaluation is described in
 `docs/evaluation.md`. Fine-tuning is deliberately deferred (`docs/future_finetuning.md`).
 
-Known limitations: no OCR (scanned PDFs are rejected with a clear message); the benchmark is only 3
+Known limitations: OCR doesn't handle handwriting; the benchmark is only 3
 synthetic documents; the Android document screens have not yet been compiled on a machine with the
 Android SDK; the legal corpus is Supreme Court judgments only, with no statutes.
 

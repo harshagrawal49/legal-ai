@@ -73,10 +73,19 @@ def test_failed_pdf_is_stored_with_reason_and_no_fabricated_text():
     case = Case(user_id="u", fact_sheet={})
     blank = pymupdf.open()
     blank.new_page()
-    doc = documents.add_document(case, "scan.pdf", blank.tobytes())
-    assert doc.status == "failed"
-    assert "OCR" in doc.error
+    doc = documents.add_document(case, "blank.pdf", blank.tobytes())
+    assert doc.status == "failed" and "No text" in doc.error
     assert doc.pages == [] and doc.facts == {}
+
+
+def test_scan_without_ocr_engine_fails_clearly(monkeypatch):
+    from app.models import Case
+    from eval.scans import make_scanned_pdf
+
+    monkeypatch.setattr(documents.ocr, "get_engine", lambda: None)
+    doc = documents.add_document(Case(user_id="u"), "scan.pdf", make_scanned_pdf(SAMPLES["advance_receipt.pdf"]))
+    assert doc.status == "failed" and "OCR isn't available" in doc.error
+    assert doc.page_info == [{"source": "ocr_unavailable"}] and doc.facts == {}
 
 
 def test_llm_failure_keeps_text(monkeypatch):

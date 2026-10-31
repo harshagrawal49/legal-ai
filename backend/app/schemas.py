@@ -95,15 +95,17 @@ class ChatMessageOut(BaseModel):
 class DocumentSummaryOut(BaseModel):
     id: uuid.UUID
     filename: str
-    status: str  # processed | text_only | failed
+    status: str  # processing | processed | text_only | failed
     error: str | None
     document_type: str | None
     page_count: int
+    ocr_pages: int = 0  # pages whose text was read by OCR
     created_at: datetime | None
 
 
 class DocumentOut(DocumentSummaryOut):
     pages: list[str]
+    page_info: list[dict] = []  # per page: {"source": "text" | "ocr" | ..., "engine", "confidence"}
     facts: dict
 
 
@@ -113,6 +115,7 @@ class SourceRefOut(BaseModel):
     page: int | None
     excerpt: str | None
     verified: bool
+    from_ocr: bool = False  # the cited page was read by OCR, so check digits and names against the original
     value: str | None = None
 
 
@@ -159,6 +162,8 @@ class BriefDocumentOut(BaseModel):
     document_type: str | None
     page_count: int
     error: str | None
+    ocr_pages: int = 0
+    ocr_confidence: float | None = None  # mean over OCR'd pages
 
 
 class BriefOut(BaseModel):

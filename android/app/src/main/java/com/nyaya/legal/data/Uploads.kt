@@ -11,17 +11,18 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 private const val MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // same limit as the backend
 
-/** MIME type for the system file picker. Only PDFs are supported by the backend. */
-const val PDF_MIME = "application/pdf"
+/** File types the backend accepts: PDFs, and photos (JPG/PNG), which are read with OCR. */
+val UPLOAD_MIMES = arrayOf("application/pdf", "image/jpeg", "image/png")
 
 /** Read a picked file and upload it to the case. Errors are IllegalStateException (shown as-is) or HTTP errors. */
-suspend fun uploadPdf(resolver: ContentResolver, caseId: String, uri: Uri): DocumentDetail {
+suspend fun uploadDocument(resolver: ContentResolver, caseId: String, uri: Uri): DocumentDetail {
     val name = displayName(resolver, uri)
+    val mime = resolver.getType(uri)?.takeIf { it in UPLOAD_MIMES } ?: UPLOAD_MIMES[0]
     val bytes = withContext(Dispatchers.IO) {
         resolver.openInputStream(uri)?.use { it.readBytes() } ?: throw IllegalStateException("Could not open the file.")
     }
     check(bytes.size <= MAX_UPLOAD_BYTES) { "The file is larger than 10 MB." }
-    val part = MultipartBody.Part.createFormData("file", name, bytes.toRequestBody(PDF_MIME.toMediaType()))
+    val part = MultipartBody.Part.createFormData("file", name, bytes.toRequestBody(mime.toMediaType()))
     return Api.service.uploadDocument(caseId, part)
 }
 

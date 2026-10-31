@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -155,12 +156,37 @@ fun DocumentScreen(caseId: String, docId: String, page: Int?, onBack: () -> Unit
                     }
                 }
                 itemsIndexed(doc.pages) { i, text ->
+                    val info = doc.pageInfo.getOrNull(i)
+                    val (label, warn) = pageLabel(info)
                     Column {
-                        Text("Page ${i + 1}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        Text(text.trim(), style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Page ${i + 1}" + (label?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (warn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(text.trim().ifEmpty { "(no text on this page)" }, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
+    }
+}
+
+/** How a page's text was obtained, and whether the user should double-check it. */
+private fun pageLabel(info: JsonObject?): Pair<String?, Boolean> {
+    val confidence = info?.get("confidence")?.jsonPrimitive?.doubleOrNull
+    return when (info?.text("source")) {
+        "ocr" -> {
+            val low = confidence != null && confidence < 60
+            ("read by OCR" + (confidence?.let { " (${it.toInt()}% confidence)" } ?: "") +
+                if (low) ": low, check against the original" else "") to low
+        }
+        "ocr_pending" -> "reading the scan…" to false
+        "ocr_unreadable" -> "scan too unclear to read" to true
+        "ocr_failed" -> "OCR failed on this page" to true
+        "ocr_unavailable" -> "scanned, OCR not available" to true
+        "ocr_skipped" -> "not read (long scan, page limit)" to true
+        else -> null to false
     }
 }

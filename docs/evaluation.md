@@ -47,7 +47,7 @@ Each run is saved to `backend/eval/results/<timestamp>.json`.
 | 2026-10-28 | v1 | none (deterministic only) | PDF handling 7/7 checks passed |
 | — | v1 | `gemini-3.8-flash` (default) | **Not yet run**: no API key was configured in the development environment |
 
-Unit tests (`uv run pytest`, 38 tests on 2026-10-30) cover PDF failure paths, safety-rule wiring, excerpt verification,
+Unit tests (`uv run pytest`, 59 passing + 2 real-engine tests skipped unless installed, on 2026-10-31) cover PDF failure paths, OCR, safety-rule wiring, excerpt verification,
 evidence flags, document citation checks, the brief's section separation and LLM fallback, and the
 document API routes. These run with the LLM faked out, so they test the code around the model, not
 the model's extraction quality.
@@ -82,6 +82,50 @@ The guardrails being tested:
 These rules are prompt-based, so they reduce risk but cannot guarantee it. A model can still be
 talked around. If the red-team run shows misses, the next step is a pre-check classifier on user
 messages.
+
+## OCR engine benchmark (v1)
+
+`backend/eval/run_ocr_eval.py` builds synthetic scans of the 3 sample documents (4 pages) at three
+quality levels (`eval/scans.py`: clean 300 dpi; photo-like 150 dpi + rotation + blur + JPEG; degraded
+120 dpi + more blur + noise + strong JPEG). Each installed engine reads them, and the output is
+compared with the original text. "Key values" = the 10 names, survey numbers and amounts from
+`EXPECTED`, which must survive OCR exactly because they feed the conflict flags.
+
+| Date | Engine | Quality | CER | WER | Key values | s/page | Mean conf. |
+|---|---|---|---|---|---|---|---|
+| 2026-10-31 | PaddleOCR 3.7 (PP-OCRv6 medium, `en`, CPU, Apple Silicon) | clean | 0.3% | 2.3% | 79% | 26.6 | 100 |
+| 2026-10-31 | PaddleOCR 3.7 | photo | 2.3% | 4.4% | 79% | 25.5 | 99 |
+| 2026-10-31 | PaddleOCR 3.7 | degraded | 5.2% | 11.8% | 57% | 25.8 | 84 |
+| 2026-10-31 | Tesseract 5.5.4 (`eng+hin+mar`, with denoise retry) | clean | 0.2% | 1.5% | 79% | 0.5 | 95 |
+| 2026-10-31 | Tesseract 5.5.4 | photo | 0.3% | 2.0% | 79% | 0.6 | 95 |
+| 2026-10-31 | Tesseract 5.5.4 | degraded | 30.9% | 49.4% | 50% | 2.0 | 70 |
+
+**Full four-engine comparison (English + Marathi/Hindi, memory, errors, conclusion): [`ocr_report.md`](ocr_report.md).**
+Decision: **Tesseract is the default** (100% key values on clean and photo Devanagari scans, about 40× faster,
+~0.1 GB against up to ~15 GB peak memory).
+
+Raw results: `backend/eval/results/ocr-20261031-144556.json`.
+
+**Representative errors (PaddleOCR):**
+- "Meera **Iyer**" → "Meera **lyer**" at every quality level (capital I read as lowercase l). It's
+  the only miss on clean and photo scans.
+- Degraded: "Rs. **5,50,000**/-" → "Rs. **5.50,000**/-" (comma read as a dot), and "Kulka**rn**i" →
+  "Kulka**m**i" (`rn` read as `m`), plus a few junk characters from speckle noise.
+
+**What we changed because of it:**
+- `parse_amount` now treats a dot followed by digits and a comma as a grouping comma, so
+  "5.50,000" is still Rs 5,50,000 and doesn't create a false amount conflict (test added).
+- The real-engine smoke test checks the critical values (survey number, amount, date); names are
+  measured here rather than asserted.
+
+**Findings acted on:**
+1. PaddleOCR's default model needs about 26 s per page and ~15 GB peak memory on CPU → Tesseract chosen as the default.
+2. Confidence doesn't catch every digit error (a degraded receipt scored 77% while misreading the
+   amount) → every OCR'd item is labelled "read by OCR, check digits and names".
+3. Tesseract was weak on degraded scans → adaptive 3×3 median-filter retry for low-confidence pages
+   (degraded key values 36% → 50% English, 20% → 50% Devanagari).
+4. Marathi survey numbers were erased by identifier normalisation → fixed (`_norm_id` keeps
+   Devanagari and maps its digits; tested).
 
 ## Not yet evaluated
 
