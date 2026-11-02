@@ -1,15 +1,20 @@
 # Nyaya: AI Legal Case Research Assistant (India)
 
-An Android app where users describe a legal problem in plain language. The app turns it into a
-structured fact sheet, finds similar Indian court judgments, explains how they relate, and lets the
-user ask follow-up questions. It is a research aid, not legal advice.
+An Android app where users describe a legal problem in plain language and upload their documents
+(agreements to sell, receipts, notices). The app turns them into a structured fact sheet and a
+source-linked evidence pack, finds similar Indian court judgments, explains how they relate, lets the
+user ask follow-up questions, and drafts a case-preparation brief to take to an advocate. It is a
+preparation and research aid, not legal advice. It does not decide ownership, predict outcomes or
+file anything.
 
 ```
 android/   Kotlin + Jetpack Compose app
 backend/   Python FastAPI service, LLM via any OpenAI-compatible API (default: Gemini free tier), Postgres + pgvector
-  app/         API routes, services (intake, search, advisor), LLM prompts & schemas
+  app/         API routes, services (intake, search, advisor, documents, evidence, brief), LLM prompts & schemas
   ingest/      pipeline that loads Supreme Court judgments into the database
+  eval/        synthetic benchmark documents + baseline evaluation script
   tests/
+docs/        evaluation baseline, future fine-tuning prerequisites
 docker-compose.yml   local Postgres with pgvector
 ```
 
@@ -25,7 +30,24 @@ docker-compose.yml   local Postgres with pgvector
 3. **Advisor chat** (`app/services/advisor.py`): a streaming conversation (server-sent events) in
    which the LLM can call `search_judgments` and `read_judgment`. Citations use the form
    `[[J:<id>]]`, and the backend reports any citation that never appeared in the conversation.
-4. **Ingestion** (`ingest/supreme_court.py`): reads the public
+4. **Documents** (`app/services/documents.py`): an uploaded PDF is checked (type, 10 MB, 60 pages,
+   encryption) and its text is extracted page by page with PyMuPDF. The LLM extracts candidate facts
+   into a validated schema (`DocumentFacts`: parties, property identifiers, amounts, events, clauses,
+   referenced documents, uncertainties), and each fact carries a page and a quoted excerpt. Code then
+   checks that each excerpt really occurs on that page (`verified`). A PDF without usable text is
+   stored as `failed` with the reason, and nothing is made up to fill the gap. Only the extracted
+   text is kept, not the file.
+5. **Evidence pack** (`app/services/evidence.py`): plain code, no LLM. It builds a chronology from
+   the documents and flags differing property identifiers, amounts or dates, mentioned documents that
+   weren't uploaded, extraction failures and unverified quotes. Every item links to a document page,
+   and the wording never draws a conclusion such as fraud or ownership.
+6. **Brief** (`app/services/brief.py`): a draft in separate sections. Document-supported facts
+   (verified quotes only), the user's own unverified account, gaps, relevant judgments, advocate
+   questions and a checklist. Only the last two come from the LLM, and if that call fails, fallbacks
+   derived from the flags are used.
+   The advisor chat can also read documents (`read_case_documents`) and cite pages as
+   `[[D:<document_id>:p<N>]]`. These citations are checked against real pages.
+7. **Ingestion** (`ingest/supreme_court.py`): reads the public
    [Indian Supreme Court Judgments](https://registry.opendata.aws/indian-supreme-court-judgments/)
    dataset, splits each judgment into its numbered paragraphs, and summarises it once with the
    bulk model. It then stores the paragraphs and summary with local embeddings.
@@ -45,20 +67,104 @@ cd backend
 cp .env.example .env          # add LLM_API_KEY
 uv sync
 
-# 3. Load some judgments (start small; each one costs one bulk-model call)
-uv run python -m ingest.supreme_court --year 2023 --limit 30
-uv run python -m ingest.supreme_court --year 2022 --limit 30 --match "developers" "buildwell" "infratech"
+# 3. Load property / land dispute judgments (Supreme Court + High Courts), one command.
+#    Incremental and safe to re-run or interrupt; no LLM calls at ingestion.
+uv run python -m ingest --dry-run --limit 50   # preview, no database needed
+uv run python -m ingest --source sc --years 2015-2026   # a good first load
+uv run python -m ingest                         # everything in scope (long first run; then weekly updates)
 
 # 4. Start the API  (docs at http://localhost:8000/docs)
 uv run uvicorn app.main:app --reload
 
 # 5. Tests (no database or API key needed)
-uv run pytest
+uv run pytest            # if the .venv was moved from another folder: uv run python -m pytest
+
+# 6. Baseline evaluation on the synthetic benchmark (see docs/evaluation.md)
+uv run python -m eval.run_eval          # deterministic checks
+uv run python -m eval.run_eval --llm    # + LLM fact extraction (needs LLM_API_KEY)
+uv run python -m eval.run_safety_eval   # safety red-team, 17 cases (needs LLM_API_KEY)
+```
+
+To try the document flow, generate the synthetic sample PDFs (fictional people and places) and upload
+them in the app under **My documents**:
+
+```bash
+uv run python -c "from eval.samples import SAMPLES, make_pdf; [open(f'/tmp/{n}','wb').write(make_pdf(p)) for n,p in SAMPLES.items()]"
 ```
 
 **Android:** open `android/` in Android Studio and run it on an emulator. The debug build talks to
 `http://10.0.2.2:8000/`, which is your machine as seen from the emulator. From the command line,
 run `cd android && ./gradlew assembleDebug`.
+
+## How each feature works
+
+One document per feature (implementation, alternatives considered, measured results): [`docs/features/`](docs/features/README.md).
+
+## Document understanding
+
+Every uploaded document (from the new-case screen, My documents or 📎 in chat) is listed in the case's
+**My documents** and in **All my documents** across cases. Opening one shows **Explained**: a one-line
+description, a plain-language summary and clause explanations, each linked to its page. Legal terms
+use meanings from a curated glossary (`app/data/legal_glossary.json`, 46 Indian property-law terms with
+Hindi names) rather than the model's own definitions, and there's a list of things to check. It's
+available in English, Hindi or Hinglish. Code drops any explanation statement whose amounts, dates or
+survey numbers aren't in the document, or that gives advice.
+
+In chat, type **@** to refer to a document; the answer then focuses on it. Every reply shows its
+**Sources** (document pages, judgments), or says it's general information. Plan: [`doc_plan.md`](doc_plan.md).
+Evaluation: [`docs/eval_report.md`](docs/eval_report.md).
+
+## Case facts: documents + the user's account
+
+The case fact sheet is built from **the user's documents (primary record) and what the user says
+(optional)**. Every party, event and amount carries its source (`user` / `D:<document>:p<page>`),
+document references are checked against the page in code, and disagreements between the user and the
+documents are kept as conflicts. Rule-based NLP (`app/services/nlp.py`: Indian amounts, dates and survey
+numbers in English and Hindi) cross-checks the AI's extraction and flags values it missed. A
+case can start from documents alone. Details and measurements: [`docs/case_facts.md`](docs/case_facts.md).
+
+## OCR (scanned PDFs and photos)
+
+Scanned pages and JPG/PNG photos are read locally with **Tesseract** (default, chosen by benchmark:
+[`docs/ocr_report.md`](docs/ocr_report.md)) or **PaddleOCR** (optional), set by `OCR_ENGINE`. OCR runs in the
+background; OCR'd pages are labelled with their confidence, and low-confidence or unreadable pages
+are flagged. The file itself is never stored.
+
+```bash
+brew install tesseract tesseract-lang     # or: apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-mar
+cd backend && uv sync --extra paddle      # optional second engine
+uv run python -m eval.run_ocr_eval        # compare the installed engines
+```
+Full reference: [`docs/ocr_steps.md`](docs/ocr_steps.md). Design: [`ocr_plan.md`](ocr_plan.md).
+
+## Speed (Gemini free tier)
+
+- **Two model tiers**: `MODEL_FAST` (flash-lite) for intake, document extraction and the brief;
+  `MODEL_MAIN` (flash) for search analysis and chat.
+- **Short thinking**: every call sends `reasoning_effort=low` (`LLM_REASONING_EFFORT`). It's dropped
+  automatically if the provider rejects it.
+- **No wasted calls**: if a model rejects JSON-schema output once, later calls go straight to JSON mode.
+- **Fail fast**: 2 retries and a 90 s timeout instead of waiting minutes on rate limits; the app shows "busy, try again".
+- **Uploads return at once**: page text is extracted during the upload; LLM fact extraction runs in
+  the background (`processing`) while the app polls.
+- **Smaller prompts**: search sends 8 candidates with 2 short paragraphs each (was 15 × 4); chat uses
+  at most 3 tool rounds; the embedding model loads at startup.
+- **Measure it**: every LLM call logs `llm <task> model=… <seconds>s in=<tokens> out=<tokens>` in the server log.
+
+## Safety guardrails
+
+- **Prompt rules** (`SAFETY_RULES` in `app/llm/prompts.py`, used by every prompt that talks to users):
+  no help with illegal or harmful acts (forgery, evidence tampering, stamp-duty or tax evasion, benami
+  deals, bribery, avoiding summons, threats, illegal eviction), with a lawful alternative offered
+  instead. Safety resources when someone may be at risk (112, 181, Tele-MANAS 14416, NALSA 15100).
+  Neutral, non-stereotyping language. No digging up third parties' personal data. No guaranteed outcomes.
+- **Code checks**: citations must resolve to sources actually retrieved or uploaded; quotes must exist
+  on the cited page; evidence flags never draw conclusions; disclaimers are fixed text; blocked or
+  empty chat replies become a safe fallback message.
+- **Tests**: `tests/test_safety.py` (wiring and scoring) and `eval/run_safety_eval.py` (red-team run
+  against the real model).
+
+These reduce risk but are not a guarantee. See `docs/evaluation.md` for limitations.
 
 ## LLM provider
 
@@ -75,18 +181,35 @@ works by changing `LLM_BASE_URL`, `LLM_API_KEY` and the model names in `.env`:
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/cases` | New case from a description → fact sheet + questions |
+| POST | `/cases` | New case from a description (optional: empty = start from documents) → fact sheet + questions |
 | POST | `/cases/{id}/intake` | Answer questions / add details |
 | PUT | `/cases/{id}/fact-sheet` | User edits the summary |
 | POST | `/cases/{id}/search` | Find and explain similar judgments |
 | GET | `/cases/{id}/results` | Saved results |
-| GET/POST | `/cases/{id}/chat` | History / send a message (SSE stream) |
+| GET/POST | `/cases/{id}/chat` | History (with sources and mentions) / send a message, with optional `mentions` (document ids referenced by @); SSE stream ends with `sources` |
 | GET | `/judgments/{id}` | Judgment summary and full paragraphs |
+| POST | `/cases/{id}/documents` | Upload a PDF or JPG/PNG photo (multipart `file`) → page text; OCR + facts in the background (415 unsupported type, 413 too large) |
+| GET | `/cases/{id}/documents` | Uploaded documents and their status |
+| GET/DELETE | `/cases/{id}/documents/{doc_id}` | Page text and facts / delete document and its data |
+| POST | `/cases/{id}/documents/{doc_id}/extract` | Retry fact extraction |
+| GET | `/cases/{id}/documents/{doc_id}/understanding?lang=en\|hi\|hinglish` | Plain-language explanation (generated once per language, cached) |
+| POST | `/cases/{id}/documents/{doc_id}/understanding/regenerate` | Rebuild the explanation |
+| GET | `/documents` | All my documents, across cases |
+| GET | `/glossary`, `/glossary/{term_id}` | Curated legal glossary |
+| GET | `/cases/{id}/evidence` | Chronology and gap/conflict flags with page sources |
+| POST | `/cases/{id}/brief` | Draft case-preparation brief (returned for review only) |
 
 ## Status
 
-Done (Phases 0–3 of the plan): project scaffold, ingestion pipeline, intake, hybrid search with
-LLM analysis, streaming advisor chat with citation checks, and Android screens for all of these.
+Done: project scaffold, ingestion pipeline, intake, hybrid search with LLM analysis, streaming
+advisor chat with citation checks, and the document workflow from `plan_claude.md`: PDF upload,
+source-linked fact extraction, evidence pack, document-aware chat and case-preparation brief, plus
+Android screens (My documents, document review, brief). Baseline evaluation is described in
+`docs/evaluation.md`. Fine-tuning is deliberately deferred (`docs/future_finetuning.md`).
+
+Known limitations: OCR doesn't handle handwriting; the benchmark is only 3
+synthetic documents; the Android document screens have not yet been compiled on a machine with the
+Android SDK; the legal corpus is Supreme Court judgments only, with no statutes.
 
 Next:
 - **Auth**: Supabase Auth; replace the `X-User-Id` header in `app/api/deps.py` and `Api.kt`.

@@ -37,6 +37,8 @@ import com.nyaya.legal.ui.Loading
 import com.nyaya.legal.ui.list
 import com.nyaya.legal.ui.text
 import kotlinx.coroutines.launch
+import com.nyaya.legal.ui.markdown.BulletText
+import com.nyaya.legal.ui.markdown.MarkdownText
 
 class JudgmentViewModel(id: String) : ViewModel() {
     var judgment by mutableStateOf<JudgmentDetail?>(null)
@@ -108,9 +110,9 @@ private fun SummaryCard(j: JudgmentDetail) {
             Text("AI summary: check it against the full text", style = MaterialTheme.typography.labelSmall)
             Labeled("Outcome", s.text("outcome"))
             Labeled("Facts", s.text("facts"))
-            Labeled("Issues", s.list("issues").joinToString("\n") { "• $it" }.ifEmpty { null })
+            LabeledList("Issues", s.list("issues"))
             Labeled("Decision and reasoning", s.text("holding"))
-            Labeled("Laws cited", s.list("acts_cited").joinToString("\n") { "• $it" }.ifEmpty { null })
+            LabeledList("Laws cited", s.list("acts_cited"))
         }
     }
 }
@@ -119,5 +121,12 @@ private fun SummaryCard(j: JudgmentDetail) {
 private fun Labeled(label: String, value: String?) {
     if (value.isNullOrBlank()) return
     Text(label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
-    Text(value, style = MaterialTheme.typography.bodyMedium)
+    MarkdownText(value)
+}
+
+@Composable
+private fun LabeledList(label: String, values: List<String>) {
+    if (values.isEmpty()) return
+    Text(label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+    values.forEach { BulletText(it) }
 }

@@ -1,0 +1,48 @@
+{
+  "benchmark_version": "1",
+  "run_at": "2026-10-28T18:01:28+00:00",
+  "pdf_handling": [
+    {
+      "case": "not a pdf",
+      "expected": "not_pdf",
+      "got": "not_pdf",
+      "ok": true
+    },
+    {
+      "case": "damaged pdf",
+      "expected": "malformed",
+      "got": "malformed",
+      "ok": true
+    },
+    {
+      "case": "scanned/blank pdf",
+      "expected": "no_text",
+      "got": "no_text",
+      "ok": true
+    },
+    {
+      "case": "password-protected pdf",
+      "expected": "encrypted",
+      "got": "encrypted",
+      "ok": true
+    },
+    {
+      "case": "text extraction: agreement_to_sell.pdf",
+      "expected": "2 pages",
+      "got": "2 pages",
+      "ok": true
+    },
+    {
+      "case": "text extraction: advance_receipt.pdf",
+      "expected": "1 pages",
+      "got": "1 pages",
+      "ok": true
+    },
+    {
+      "case": "text extraction: legal_notice.pdf",
+      "expected": "1 pages",
+      "got": "1 pages",
+      "ok": true
+    }
+  ]
+}

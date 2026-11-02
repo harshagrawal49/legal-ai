@@ -1,0 +1,747 @@
+{
+ "version": "2",
+ "note": "Curated plain-language explanations of Indian property-law terms, for English and Hindi documents. General information, not legal advice. Hindi entries give the term's Hindi name; full Hindi explanations need review by a native speaker before adding.",
+ "terms": [
+  {
+   "id": "agreement_to_sell",
+   "term": "Agreement to sell",
+   "names": {
+    "hi": "विक्रय अनुबंध"
+   },
+   "variants": [
+    "agreement to sell",
+    "agreement for sale",
+    "sale agreement",
+    "contract for sale",
+    "विक्रय अनुबंध",
+    "बिक्री अनुबंध",
+    "करारनामा"
+   ],
+   "meaning": "A written promise that a property will be sold in future on agreed terms. It does not by itself make the buyer the owner; ownership passes only through a registered sale deed.",
+   "why": "It records the price, advance and deadlines both sides agreed to, so it is usually the main document in a dispute about a sale that didn't happen.",
+   "law": "Transfer of Property Act, 1882, s.54"
+  },
+  {
+   "id": "sale_deed",
+   "term": "Sale deed",
+   "names": {
+    "hi": "विक्रय पत्र / बैनामा"
+   },
+   "variants": [
+    "sale deed",
+    "deed of sale",
+    "conveyance deed",
+    "विक्रय पत्र",
+    "बैनामा"
+   ],
+   "meaning": "The document that actually transfers ownership of the property from the seller to the buyer. It must be stamped and registered.",
+   "why": "Who holds a registered sale deed is central to who owns the property.",
+   "law": "Transfer of Property Act, 1882, s.54; Registration Act, 1908, s.17"
+  },
+  {
+   "id": "conveyance",
+   "term": "Conveyance",
+   "names": {
+    "hi": "हस्तांतरण"
+   },
+   "variants": [
+    "conveyance",
+    "convey",
+    "conveyed",
+    "हस्तांतरण"
+   ],
+   "meaning": "Transferring ownership of property from one person to another, usually by a deed.",
+   "why": "A promise to convey (an agreement) is different from the conveyance itself (the deed)."
+  },
+  {
+   "id": "consideration",
+   "term": "Consideration (sale price)",
+   "names": {
+    "hi": "प्रतिफल / विक्रय मूल्य"
+   },
+   "variants": [
+    "consideration",
+    "sale consideration",
+    "total consideration",
+    "प्रतिफल",
+    "विक्रय मूल्य"
+   ],
+   "meaning": "The price or value given in exchange for the property.",
+   "why": "Differences in the stated price between documents are worth checking."
+  },
+  {
+   "id": "earnest_money",
+   "term": "Earnest money / advance",
+   "names": {
+    "hi": "बयाना / अग्रिम राशि"
+   },
+   "variants": [
+    "earnest money",
+    "advance",
+    "token amount",
+    "token money",
+    "बयाना",
+    "अग्रिम राशि",
+    "अग्रिम"
+   ],
+   "meaning": "A part payment made when the agreement is signed, to show the buyer is serious. Whether it is refunded or forfeited if the deal fails depends on the agreement's terms and the circumstances.",
+   "why": "Many disputes are about getting the advance back, or about the seller keeping it."
+  },
+  {
+   "id": "balance_consideration",
+   "term": "Balance consideration",
+   "names": {
+    "hi": "शेष राशि"
+   },
+   "variants": [
+    "balance consideration",
+    "balance amount",
+    "balance of",
+    "remaining amount",
+    "शेष राशि"
+   ],
+   "meaning": "The rest of the price still to be paid after the advance, usually at registration.",
+   "why": "The deadline for paying the balance often decides who was ready to complete the sale."
+  },
+  {
+   "id": "possession",
+   "term": "Possession",
+   "names": {
+    "hi": "कब्ज़ा"
+   },
+   "variants": [
+    "possession",
+    "handed over possession",
+    "कब्जा",
+    "कब्ज़ा"
+   ],
+   "meaning": "Actual physical control of the property (living on it, using it, holding the keys). Possession and ownership are not the same thing.",
+   "why": "Who is in possession, and since when, matters for many remedies and for claims like part performance."
+  },
+  {
+   "id": "part_performance",
+   "term": "Part performance",
+   "names": {
+    "hi": "आंशिक पालन"
+   },
+   "variants": [
+    "part performance",
+    "section 53a",
+    "s. 53a",
+    "53a"
+   ],
+   "meaning": "A protection for a buyer who, under a written agreement, has been given possession and has done their part (for example paid money), against the seller trying to take the property back.",
+   "why": "It can matter when the buyer already has possession but no sale deed.",
+   "law": "Transfer of Property Act, 1882, s.53A"
+  },
+  {
+   "id": "title",
+   "term": "Title",
+   "names": {
+    "hi": "स्वामित्व"
+   },
+   "variants": [
+    "clear title",
+    "marketable title",
+    "title deed",
+    "title of the property",
+    "स्वामित्व"
+   ],
+   "meaning": "The legal right of ownership of a property. 'Clear' or 'marketable' title means no one else has a competing claim.",
+   "why": "A seller usually promises clear title; claims by others (another buyer, heirs, a bank) affect it."
+  },
+  {
+   "id": "encumbrance",
+   "term": "Encumbrance",
+   "names": {
+    "hi": "भार"
+   },
+   "variants": [
+    "encumbrance",
+    "encumbrances",
+    "free from encumbrance",
+    "भार"
+   ],
+   "meaning": "Any claim or burden on a property, such as a mortgage, loan, lease or court order.",
+   "why": "A property sold 'free from encumbrances' should have no such claims; an encumbrance can block or complicate a sale."
+  },
+  {
+   "id": "encumbrance_certificate",
+   "term": "Encumbrance certificate",
+   "names": {
+    "hi": "भार प्रमाणपत्र"
+   },
+   "variants": [
+    "encumbrance certificate",
+    "e.c.",
+    "भार प्रमाणपत्र"
+   ],
+   "meaning": "A certificate from the sub-registrar's office listing the registered transactions on a property for a period.",
+   "why": "It can show whether the same property was registered in someone else's name."
+  },
+  {
+   "id": "seven_twelve",
+   "term": "7/12 extract (Satbara)",
+   "names": {
+    "hi": "सातबारा उतारा"
+   },
+   "variants": [
+    "7/12 extract",
+    "7/12",
+    "7-12 extract",
+    "satbara",
+    "सातबारा",
+    "७/१२"
+   ],
+   "meaning": "A Maharashtra land record (Record of Rights) showing the survey number, area, holders and cultivators, and loans or other entries on agricultural land. Other states use different records, such as khasra and khatauni.",
+   "why": "It is useful evidence about land, but revenue records are not by themselves proof of ownership.",
+   "law": "Maharashtra Land Revenue Code, 1966"
+  },
+  {
+   "id": "mutation",
+   "term": "Mutation",
+   "names": {
+    "hi": "दाखिल-खारिज / नामांतरण"
+   },
+   "variants": [
+    "mutation",
+    "mutation entry",
+    "नामांतरण",
+    "दाखिल खारिज",
+    "दाखिल-खारिज"
+   ],
+   "meaning": "Changing the owner's name in the government's revenue or municipal records after a sale, inheritance or other transfer.",
+   "why": "Mutation is for tax and record purposes; it does not by itself create or end ownership."
+  },
+  {
+   "id": "khasra_khatauni",
+   "term": "Khasra / khatauni / jamabandi",
+   "names": {
+    "hi": "खसरा / खतौनी / जमाबंदी"
+   },
+   "variants": [
+    "khasra",
+    "khatauni",
+    "jamabandi",
+    "khewat",
+    "खसरा",
+    "खतौनी",
+    "जमाबंदी",
+    "खेवट"
+   ],
+   "meaning": "Land records used in many North Indian states: the khasra number identifies a plot; the khatauni / jamabandi lists who holds which land and their shares.",
+   "why": "They show the recorded holders of land, but like other revenue records they are not by themselves conclusive proof of ownership.",
+   "law": "State land revenue laws (e.g. UP Revenue Code, 2006)"
+  },
+  {
+   "id": "khata",
+   "term": "Khata / property card",
+   "names": {
+    "hi": "खाता"
+   },
+   "variants": [
+    "khata",
+    "property card",
+    "property tax record",
+    "खाता"
+   ],
+   "meaning": "A municipal record of a property and the person liable to pay property tax.",
+   "why": "Like mutation, it shows who is recorded, not conclusively who owns."
+  },
+  {
+   "id": "survey_number",
+   "term": "Survey / gat / CTS number",
+   "names": {
+    "hi": "सर्वे नंबर"
+   },
+   "variants": [
+    "survey no",
+    "survey number",
+    "gat no",
+    "gat number",
+    "cts no",
+    "city survey no",
+    "सर्वे नंबर",
+    "सर्वे क्रमांक"
+   ],
+   "meaning": "The government's identification number for a piece of land in the land records.",
+   "why": "If two documents give different numbers, they may describe different land, or one has a mistake."
+  },
+  {
+   "id": "power_of_attorney",
+   "term": "Power of attorney (GPA / SPA)",
+   "names": {
+    "hi": "मुख्तारनामा"
+   },
+   "variants": [
+    "power of attorney",
+    "general power of attorney",
+    "special power of attorney",
+    "gpa",
+    "spa",
+    "मुख्तारनामा"
+   ],
+   "meaning": "A document authorising someone to act on another person's behalf, for example to sign documents.",
+   "why": "The Supreme Court has held that a sale through a power of attorney alone, without a registered sale deed, does not transfer ownership (Suraj Lamp, 2011).",
+   "law": "Powers of Attorney Act, 1882"
+  },
+  {
+   "id": "stamp_duty",
+   "term": "Stamp duty",
+   "names": {
+    "hi": "स्टांप शुल्क"
+   },
+   "variants": [
+    "stamp duty",
+    "stamp paper",
+    "e-stamp",
+    "स्टांप शुल्क",
+    "स्टाम्प"
+   ],
+   "meaning": "A state tax paid on documents such as sale deeds and some agreements. Documents that aren't properly stamped can face problems being used as evidence.",
+   "why": "Whether an agreement was stamped can matter if it has to be relied on in court.",
+   "law": "Indian Stamp Act, 1899 / state stamp acts (e.g. Maharashtra Stamp Act)"
+  },
+  {
+   "id": "registration",
+   "term": "Registration",
+   "names": {
+    "hi": "पंजीकरण / रजिस्ट्री"
+   },
+   "variants": [
+    "registration",
+    "registered",
+    "sub-registrar",
+    "sub registrar",
+    "पंजीकरण",
+    "रजिस्ट्री",
+    "उप पंजीयक"
+   ],
+   "meaning": "Recording a document at the sub-registrar's office. Documents that transfer ownership of immovable property must be registered.",
+   "why": "An unregistered sale deed generally can't transfer ownership; registration dates also matter when two buyers claim the same property.",
+   "law": "Registration Act, 1908, s.17"
+  },
+  {
+   "id": "specific_performance",
+   "term": "Specific performance",
+   "names": {
+    "hi": "विशिष्ट पालन"
+   },
+   "variants": [
+    "specific performance",
+    "execute the sale deed",
+    "execution of sale deed",
+    "विशिष्ट पालन"
+   ],
+   "meaning": "A court order requiring a party to actually do what they promised in a contract, such as completing a sale, rather than just paying compensation.",
+   "why": "A buyer under an agreement to sell may ask the court to compel the seller to execute the sale deed; time limits apply.",
+   "law": "Specific Relief Act, 1963; Limitation Act, 1963, Art. 54"
+  },
+  {
+   "id": "refund_interest",
+   "term": "Refund with interest",
+   "names": {
+    "hi": "ब्याज सहित वापसी"
+   },
+   "variants": [
+    "refund the advance",
+    "refund with interest",
+    "with interest",
+    "ब्याज सहित"
+   ],
+   "meaning": "Returning money paid, along with interest at a stated or court-decided rate.",
+   "why": "Many agreements say what happens to the advance if the sale fails; this is often the first relief claimed."
+  },
+  {
+   "id": "forfeiture",
+   "term": "Forfeiture",
+   "names": {
+    "hi": "ज़ब्ती"
+   },
+   "variants": [
+    "forfeit",
+    "forfeiture",
+    "forfeited",
+    "ज़ब्त",
+    "जब्त"
+   ],
+   "meaning": "Losing a payment (often the advance) as a penalty for not completing the deal, if the agreement allows it.",
+   "why": "Whether the seller may keep the advance depends on the agreement and on whether the forfeiture is reasonable."
+  },
+  {
+   "id": "time_essence",
+   "term": "Time is of the essence",
+   "names": {
+    "hi": "समय सार है"
+   },
+   "variants": [
+    "time is of the essence",
+    "time shall be the essence",
+    "essence of the contract"
+   ],
+   "meaning": "A clause saying deadlines are strict, so missing one can end the contract.",
+   "why": "In property sales, courts generally treat deadlines as not strict unless the agreement clearly makes them so."
+  },
+  {
+   "id": "default_breach",
+   "term": "Default / breach",
+   "names": {
+    "hi": "चूक / अनुबंध का उल्लंघन"
+   },
+   "variants": [
+    "default",
+    "breach",
+    "breach of contract",
+    "fails to",
+    "उल्लंघन",
+    "भंग"
+   ],
+   "meaning": "Failing to do what the contract requires, such as not paying on time or not executing the deed.",
+   "why": "Which side defaulted first is often the core question in an agreement-to-sell dispute."
+  },
+  {
+   "id": "legal_notice",
+   "term": "Legal notice",
+   "names": {
+    "hi": "कानूनी नोटिस"
+   },
+   "variants": [
+    "legal notice",
+    "notice",
+    "calls upon you",
+    "कानूनी नोटिस",
+    "नोटिस"
+   ],
+   "meaning": "A formal letter, usually sent through an advocate, stating a claim and asking the other side to act within a time.",
+   "why": "It records one side's position and the date the demand was made; it is a claim, not a finding."
+  },
+  {
+   "id": "lis_pendens",
+   "term": "Lis pendens",
+   "names": {
+    "hi": "लंबित वाद"
+   },
+   "variants": [
+    "lis pendens",
+    "section 52",
+    "pending suit"
+   ],
+   "meaning": "The rule that a property involved in a pending court case can't be transferred in a way that defeats the case's outcome.",
+   "why": "A sale made while a suit about the property is pending is subject to the result of that suit.",
+   "law": "Transfer of Property Act, 1882, s.52"
+  },
+  {
+   "id": "injunction",
+   "term": "Injunction",
+   "names": {
+    "hi": "निषेधाज्ञा / स्थगन आदेश"
+   },
+   "variants": [
+    "injunction",
+    "stay order",
+    "restrain",
+    "restraining",
+    "निषेधाज्ञा",
+    "स्थगन"
+   ],
+   "meaning": "A court order telling someone to do or not do something, for example not to sell the property while a case is decided.",
+   "why": "A temporary injunction can stop a second sale while a dispute is heard.",
+   "law": "Code of Civil Procedure, 1908, Order 39"
+  },
+  {
+   "id": "caveat",
+   "term": "Caveat",
+   "names": {
+    "hi": "कैविएट"
+   },
+   "variants": [
+    "caveat",
+    "कैविएट"
+   ],
+   "meaning": "A request to a court to be heard before any order is passed in a case the person expects to be filed.",
+   "why": "It prevents an order being made against someone without notice.",
+   "law": "Code of Civil Procedure, 1908, s.148A"
+  },
+  {
+   "id": "indemnity",
+   "term": "Indemnity",
+   "names": {
+    "hi": "क्षतिपूर्ति"
+   },
+   "variants": [
+    "indemnity",
+    "indemnify",
+    "क्षतिपूर्ति"
+   ],
+   "meaning": "A promise to cover the other person's losses if certain things happen, for example a defect in title.",
+   "why": "It may decide who bears the cost if a third party claims the property."
+  },
+  {
+   "id": "witness_attestation",
+   "term": "Witness / attestation",
+   "names": {
+    "hi": "गवाह / सत्यापन"
+   },
+   "variants": [
+    "witness",
+    "witnesses",
+    "attested",
+    "attestation",
+    "गवाह",
+    "साक्षी"
+   ],
+   "meaning": "People who sign a document to confirm they saw it being signed.",
+   "why": "Witnesses can later confirm the document was really signed by the parties."
+  },
+  {
+   "id": "executant",
+   "term": "Executant",
+   "names": {
+    "hi": "निष्पादक"
+   },
+   "variants": [
+    "executant",
+    "executed",
+    "execute",
+    "निष्पादक"
+   ],
+   "meaning": "The person who signs (executes) a document and is bound by it, such as the seller in a sale deed.",
+   "why": "'Execute the sale deed' means sign and register it."
+  },
+  {
+   "id": "vendor_purchaser",
+   "term": "Vendor / purchaser",
+   "names": {
+    "hi": "विक्रेता / क्रेता"
+   },
+   "variants": [
+    "vendor",
+    "vendee",
+    "purchaser",
+    "विक्रेता",
+    "क्रेता"
+   ],
+   "meaning": "Vendor means the seller; purchaser (or vendee) means the buyer.",
+   "why": "Documents often use these words instead of names."
+  },
+  {
+   "id": "freehold_leasehold",
+   "term": "Freehold / leasehold",
+   "names": {
+    "hi": "फ्रीहोल्ड / लीज़होल्ड"
+   },
+   "variants": [
+    "freehold",
+    "leasehold",
+    "lease deed",
+    "पट्टा"
+   ],
+   "meaning": "Freehold means outright ownership; leasehold means a right to use the property for a fixed period under a lease.",
+   "why": "A leasehold property may need the lessor's permission to transfer."
+  },
+  {
+   "id": "na_permission",
+   "term": "NA (non-agricultural) permission",
+   "names": {
+    "hi": "गैर-कृषि अनुमति"
+   },
+   "variants": [
+    "non-agricultural",
+    "non agricultural",
+    "na permission",
+    "na order",
+    "गैर कृषि",
+    "गैर-कृषि"
+   ],
+   "meaning": "Government permission to use agricultural land for other purposes such as housing.",
+   "why": "Plots sold for building without NA permission can face legal and regulatory problems."
+  },
+  {
+   "id": "occupancy_certificate",
+   "term": "Occupancy / completion certificate",
+   "names": {
+    "hi": "अधिभोग प्रमाणपत्र"
+   },
+   "variants": [
+    "occupancy certificate",
+    "completion certificate",
+    "o.c.",
+    "अधिभोग प्रमाणपत्र"
+   ],
+   "meaning": "A municipal certificate confirming a building was built as approved and is fit to occupy.",
+   "why": "Relevant in disputes with builders about handing over flats."
+  },
+  {
+   "id": "rera",
+   "term": "RERA",
+   "names": {
+    "hi": "रेरा"
+   },
+   "variants": [
+    "rera",
+    "real estate (regulation and development)",
+    "रेरा"
+   ],
+   "meaning": "The law and state authority regulating real-estate projects and builders; buyers can file complaints about delays and refunds.",
+   "why": "For flats in registered projects, RERA may offer a faster forum than a civil court.",
+   "law": "Real Estate (Regulation and Development) Act, 2016"
+  },
+  {
+   "id": "allotment_letter",
+   "term": "Allotment letter",
+   "names": {
+    "hi": "आवंटन पत्र"
+   },
+   "variants": [
+    "allotment letter",
+    "letter of allotment",
+    "आवंटन पत्र"
+   ],
+   "meaning": "A builder's letter allotting a specific flat or unit to a buyer, before the sale agreement.",
+   "why": "It shows what was promised and when."
+  },
+  {
+   "id": "cheque_dishonour",
+   "term": "Cheque dishonour (s.138)",
+   "names": {
+    "hi": "चेक अनादरण"
+   },
+   "variants": [
+    "dishonour",
+    "dishonoured",
+    "cheque bounce",
+    "section 138",
+    "s.138",
+    "चेक बाउंस",
+    "अनादर"
+   ],
+   "meaning": "When a cheque is returned unpaid. Issuing a cheque that bounces for lack of funds can be a criminal offence after a notice period.",
+   "why": "If a refund or payment cheque bounced, there may be a separate remedy with strict time limits.",
+   "law": "Negotiable Instruments Act, 1881, s.138"
+  },
+  {
+   "id": "legal_heir",
+   "term": "Legal heir / succession",
+   "names": {
+    "hi": "वारिस / उत्तराधिकार"
+   },
+   "variants": [
+    "legal heir",
+    "legal heirs",
+    "succession",
+    "heirship",
+    "वारिस",
+    "उत्तराधिकार"
+   ],
+   "meaning": "People entitled to inherit a person's property after death, and the process of transferring it to them.",
+   "why": "If the owner has died, the heirs' consent may be needed for a valid sale."
+  },
+  {
+   "id": "partition",
+   "term": "Partition",
+   "names": {
+    "hi": "बंटवारा"
+   },
+   "variants": [
+    "partition",
+    "partition deed",
+    "बंटवारा"
+   ],
+   "meaning": "Dividing jointly owned property among co-owners, by agreement or by court order.",
+   "why": "A co-owner usually can't sell a specific part of joint property before it is partitioned."
+  },
+  {
+   "id": "gift_deed",
+   "term": "Gift deed",
+   "names": {
+    "hi": "दान पत्र"
+   },
+   "variants": [
+    "gift deed",
+    "दान पत्र",
+    "दानपत्र"
+   ],
+   "meaning": "A registered document transferring property without payment.",
+   "why": "Another way ownership can change hands, which may appear in a property's history."
+  },
+  {
+   "id": "will_probate",
+   "term": "Will / probate",
+   "names": {
+    "hi": "वसीयत"
+   },
+   "variants": [
+    "last will",
+    "will and testament",
+    "probate",
+    "testament",
+    "वसीयत",
+    "वसीयतनामा"
+   ],
+   "meaning": "A will states how a person's property should pass after death; probate is a court's confirmation of the will.",
+   "why": "Claims under a will can affect who may sell a property."
+  },
+  {
+   "id": "adverse_possession",
+   "term": "Adverse possession",
+   "names": {
+    "hi": "प्रतिकूल कब्ज़ा"
+   },
+   "variants": [
+    "adverse possession",
+    "प्रतिकूल कब्जा"
+   ],
+   "meaning": "A claim to ownership by someone who has openly occupied another's property without permission for a long period (12 years for private land).",
+   "why": "It is a strict doctrine; long, open, uninterrupted possession must be proved.",
+   "law": "Limitation Act, 1963, Art. 65"
+  },
+  {
+   "id": "benami",
+   "term": "Benami transaction",
+   "names": {
+    "hi": "बेनामी लेनदेन"
+   },
+   "variants": [
+    "benami",
+    "बेनामी"
+   ],
+   "meaning": "Property bought in one person's name while another person paid for it and is the real owner. Such transactions are prohibited, with some exceptions.",
+   "why": "Claims that a property is benami raise serious legal issues; get an advocate's advice.",
+   "law": "Benami Transactions (Prohibition) Act, 1988"
+  },
+  {
+   "id": "limitation",
+   "term": "Limitation period",
+   "names": {
+    "hi": "परिसीमा अवधि"
+   },
+   "variants": [
+    "limitation",
+    "time-barred",
+    "time barred",
+    "परिसीमा"
+   ],
+   "meaning": "The time limit for filing a case. For example, a suit for specific performance generally has three years from the date fixed for performance or from when performance was refused.",
+   "why": "Missing the limitation period can end a claim, so dates in your documents matter.",
+   "law": "Limitation Act, 1963"
+  },
+  {
+   "id": "plaintiff_defendant",
+   "term": "Plaintiff / defendant",
+   "names": {
+    "hi": "वादी / प्रतिवादी"
+   },
+   "variants": [
+    "plaintiff",
+    "defendant",
+    "petitioner",
+    "respondent",
+    "वादी",
+    "प्रतिवादी",
+    "याचिकाकर्ता"
+   ],
+   "meaning": "The plaintiff (or petitioner) is the person who files a case; the defendant (or respondent) is the person it is filed against.",
+   "why": "Court documents use these roles instead of names."
+  }
+ ]
+}

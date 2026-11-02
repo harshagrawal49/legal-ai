@@ -8,8 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.nyaya.legal.ui.brief.BriefScreen
 import com.nyaya.legal.ui.cases.CaseListScreen
+import com.nyaya.legal.ui.cases.CaseScreen
 import com.nyaya.legal.ui.chat.ChatScreen
+import com.nyaya.legal.ui.documents.DocumentScreen
+import com.nyaya.legal.ui.documents.DocumentsScreen
 import com.nyaya.legal.ui.intake.IntakeScreen
 import com.nyaya.legal.ui.judgment.JudgmentScreen
 import com.nyaya.legal.ui.results.ResultsScreen
@@ -30,18 +34,32 @@ fun AppNavigation() {
         composable("cases") {
             CaseListScreen(
                 onNewCase = { nav.navigate("intake") },
-                onOpenCase = { case ->
-                    nav.navigate(if (case.status == "searched") "results/${case.id}" else "intake?caseId=${case.id}")
-                },
+                onOpenCase = { case -> nav.navigate("case/${case.id}") },
+                onOpenDocument = { caseId, docId -> nav.navigate(documentRoute(caseId, docId, null)) },
+            )
+        }
+        composable("case/{caseId}") { entry ->
+            val caseId = entry.arguments!!.getString("caseId")!!
+            CaseScreen(
+                caseId = caseId,
+                onBack = { nav.popBackStack() },
+                onChat = { nav.navigate("chat/$caseId") },
+                onDocuments = { nav.navigate("documents/$caseId") },
+                onResults = { nav.navigate("results/$caseId") },
+                onIntake = { nav.navigate("intake?caseId=$caseId") },
+                onBrief = { nav.navigate("brief/$caseId") },
             )
         }
         composable("intake?caseId={caseId}") { entry ->
             IntakeScreen(
                 caseId = entry.arguments?.getString("caseId"),
                 onBack = { nav.popBackStack() },
+                // After the search, show the results; Back goes to the case home (chat, documents, brief).
                 onResults = { caseId ->
-                    nav.navigate("results/$caseId") { popUpTo("cases") }
+                    nav.navigate("case/$caseId") { popUpTo("cases") }
+                    nav.navigate("results/$caseId")
                 },
+                onDocuments = { caseId -> nav.navigate("documents/$caseId") },
             )
         }
         composable("results/{caseId}") { entry ->
@@ -51,17 +69,52 @@ fun AppNavigation() {
                 onBack = { nav.popBackStack() },
                 onOpenJudgment = { nav.navigate("judgment/$it") },
                 onChat = { nav.navigate("chat/$caseId") },
+                onDocuments = { nav.navigate("documents/$caseId") },
             )
         }
         composable("judgment/{id}") { entry ->
             JudgmentScreen(id = entry.arguments!!.getString("id")!!, onBack = { nav.popBackStack() })
         }
-        composable("chat/{caseId}") { entry ->
+        composable("chat/{caseId}?mention={mention}") { entry ->
+            val caseId = entry.arguments!!.getString("caseId")!!
             ChatScreen(
-                caseId = entry.arguments!!.getString("caseId")!!,
+                caseId = caseId,
                 onBack = { nav.popBackStack() },
+                onOpenJudgment = { nav.navigate("judgment/$it") },
+                onOpenDocument = { docId, page -> nav.navigate(documentRoute(caseId, docId, page)) },
+                initialMention = entry.arguments?.getString("mention"),
+            )
+        }
+        composable("documents/{caseId}") { entry ->
+            val caseId = entry.arguments!!.getString("caseId")!!
+            DocumentsScreen(
+                caseId = caseId,
+                onBack = { nav.popBackStack() },
+                onOpenDocument = { docId, page -> nav.navigate(documentRoute(caseId, docId, page)) },
+                onBrief = { nav.navigate("brief/$caseId") },
+            )
+        }
+        composable("document/{caseId}/{docId}?page={page}") { entry ->
+            val caseId = entry.arguments!!.getString("caseId")!!
+            DocumentScreen(
+                caseId = caseId,
+                docId = entry.arguments!!.getString("docId")!!,
+                page = entry.arguments?.getString("page")?.toIntOrNull(),
+                onBack = { nav.popBackStack() },
+                onAsk = { docId -> nav.navigate("chat/$caseId?mention=$docId") },
+            )
+        }
+        composable("brief/{caseId}") { entry ->
+            val caseId = entry.arguments!!.getString("caseId")!!
+            BriefScreen(
+                caseId = caseId,
+                onBack = { nav.popBackStack() },
+                onOpenDocument = { docId, page -> nav.navigate(documentRoute(caseId, docId, page)) },
                 onOpenJudgment = { nav.navigate("judgment/$it") },
             )
         }
     }
 }
+
+private fun documentRoute(caseId: String, docId: String, page: Int?) =
+    "document/$caseId/$docId" + (page?.let { "?page=$it" } ?: "")

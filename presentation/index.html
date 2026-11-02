@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NyayaSathi AI</title>
+<!--
+  NyayaSathi AI: project presentation. One file, works offline.
+
+  Keys:  → / Space / click: next   ← : previous   Home / End
+         N: speaker notes   F: fullscreen   G: go to slide number   Esc: close panels
+
+  Demo screens: put GIFs or screenshots in  presentation/demo/  with these names (any of .gif .png .jpg .webp):
+    01-home            home screen: My cases / All my documents
+    02-new-case        describing the case, attaching documents
+    03-upload          uploading a PDF or photo, "Reading…"
+    04-explained       a document's "Explained" view (summary, clauses, terms)
+    05-language        switching English / हिन्दी / Hinglish
+    06-timeline        timeline and flags (conflicts highlighted)
+    07-case-summary    case summary with source chips
+    08-similar-cases   similar judgments
+    09-chat-mention    chat with @document and Sources
+    10-brief           the case-preparation brief
+    11-safety          a refused request with helplines
+    12-full-demo       the whole journey (optional)
+  Until a file exists, a labelled placeholder is shown in its place.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b1020; --bg2: #121a33; --panel: #172142; --line: #2a3766;
+  --text: #eef1fb; --muted: #a8b1d6; --dim: #6f7aa8;
+  --saffron: #ffb347; --saffron2: #ff8c42; --teal: #3ad1c3; --blue: #6ea8ff; --red: #ff6b6b; --green: #4ade80; --violet: #b18cff;
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --deva: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+.deva { font-family: var(--deva); }
+
+/* ---------- Stage: a 1600×900 canvas scaled to the window ---------- */
+#viewport { position: fixed; inset: 0; display: grid; place-items: center; }
+#stage { width: 1600px; height: 900px; position: relative; transform-origin: center center; }
+.slide {
+  position: absolute; inset: 0; padding: 70px 96px; opacity: 0; pointer-events: none;
+  transition: opacity .6s ease, transform .8s cubic-bezier(.2,.8,.2,1); transform: translateY(24px) scale(.985);
+  display: flex; flex-direction: column;
+}
+.slide.active { opacity: 1; pointer-events: auto; transform: none; }
+.slide.past { transform: translateY(-24px) scale(.985); }
+
+/* Ambient background */
+#bgcanvas { position: fixed; inset: 0; z-index: -1; }
+body::before {
+  content: ""; position: fixed; inset: -20%; z-index: -2;
+  background: radial-gradient(40% 40% at 20% 20%, #1d2a5a 0%, transparent 70%),
+              radial-gradient(35% 35% at 85% 80%, #3a2a16 0%, transparent 70%), var(--bg);
+  animation: drift 24s ease-in-out infinite alternate;
+}
+@keyframes drift { to { transform: translate(3%, -2%) rotate(3deg); } }
+
+/* ---------- Chrome ---------- */
+#progress { position: fixed; top: 0; left: 0; height: 4px; background: linear-gradient(90deg, var(--saffron), var(--teal)); transition: width .5s; z-index: 10; }
+#chapter { position: fixed; bottom: 18px; left: 28px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); z-index: 10; }
+#counter { position: fixed; bottom: 18px; right: 28px; font: 13px var(--mono); color: var(--dim); z-index: 10; }
+#notes {
+  position: fixed; right: 20px; bottom: 50px; width: min(520px, 90vw); max-height: 55vh; overflow: auto; z-index: 20;
+  background: rgba(10,14,30,.96); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; font-size: 15px; line-height: 1.55;
+  color: var(--muted); display: none; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+#notes.open { display: block; }
+#notes h4 { color: var(--saffron); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 8px; }
+#hint { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--dim); z-index: 10; opacity: .8; transition: opacity 1s; }
+aside.notes { display: none; }
+
+/* ---------- Typography & building blocks ---------- */
+.kicker { font-size: 15px; letter-spacing: .22em; text-transform: uppercase; color: var(--saffron); font-weight: 700; margin-bottom: 14px; }
+h1 { font-size: 86px; line-height: 1.02; font-weight: 800; letter-spacing: -.02em; }
+h2 { font-size: 54px; line-height: 1.08; font-weight: 800; letter-spacing: -.015em; margin-bottom: 26px; }
+h3 { font-size: 26px; font-weight: 700; margin-bottom: 10px; }
+p, li { font-size: 24px; line-height: 1.5; color: var(--muted); }
+.lead { font-size: 30px; line-height: 1.45; color: var(--text); font-weight: 500; }
+.grad { background: linear-gradient(90deg, var(--saffron), var(--teal)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.small { font-size: 17px; color: var(--dim); }
+.mono { font-family: var(--mono); }
+.row { display: flex; gap: 28px; }
+.col { display: flex; flex-direction: column; gap: 18px; }
+.grow { flex: 1; }
+.center { align-items: center; justify-content: center; text-align: center; }
+.card { background: linear-gradient(180deg, rgba(30,42,84,.75), rgba(20,28,58,.75)); border: 1px solid var(--line); border-radius: 20px; padding: 26px 28px; backdrop-filter: blur(6px); }
+.card p { font-size: 20px; }
+.tag { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 15px; font-weight: 600; border: 1px solid currentColor; }
+.t-green { color: var(--green); } .t-red { color: var(--red); } .t-teal { color: var(--teal); } .t-saffron { color: var(--saffron); } .t-blue { color: var(--blue); } .t-violet { color: var(--violet); }
+.src { position: absolute; bottom: 52px; left: 96px; font-size: 14px; color: var(--dim); }
+
+/* Reveal: children with class r animate in when their slide becomes active, staggered by --d */
+.r { opacity: 0; }
+.slide.active .r { animation: rise .8s cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--d, 0s); }
+.slide.active .r.pop { animation-name: pop; }
+.slide.active .r.left { animation-name: fromLeft; }
+.slide.active .r.right { animation-name: fromRight; }
+@keyframes rise { from { opacity: 0; transform: translateY(28px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes pop { 0% { opacity: 0; transform: scale(.6); } 70% { opacity: 1; transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes fromLeft { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: none; } }
+@keyframes fromRight { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Title ---------- */
+.emblem { width: 210px; height: 210px; margin-bottom: 26px; }
+.emblem .ring { fill: none; stroke: url(#g1); stroke-width: 3; stroke-dasharray: 700; stroke-dashoffset: 700; }
+.slide.active .emblem .ring { animation: draw 2.4s ease forwards; }
+.emblem .beam { stroke: var(--saffron); stroke-width: 5; stroke-linecap: round; transform-origin: 105px 70px; }
+.slide.active .emblem .beam { animation: tilt 3.5s ease-in-out 1.2s infinite alternate; }
+.emblem .pan { fill: none; stroke: var(--teal); stroke-width: 4; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes tilt { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+.title-word span { display: inline-block; opacity: 0; transform: translateY(40px); }
+.slide.active .title-word span { animation: rise .7s cubic-bezier(.2,.8,.2,1) forwards; }
+
+/* ---------- Story timeline (Meera) ---------- */
+.story { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 30px; position: relative; }
+.story::before { content: ""; position: absolute; left: 4%; right: 4%; top: 46px; height: 3px; background: var(--line); }
+.story .beat { position: relative; text-align: center; }
+.story .dot { width: 92px; height: 92px; border-radius: 50%; margin: 0 auto 18px; display: grid; place-items: center; font-size: 40px; background: var(--panel); border: 3px solid var(--saffron); box-shadow: 0 0 0 8px rgba(255,179,71,.08); }
+.story .beat.bad .dot { border-color: var(--red); box-shadow: 0 0 0 8px rgba(255,107,107,.1); }
+.story h3 { font-size: 22px; } .story p { font-size: 18px; }
+
+/* ---------- Scattered documents ---------- */
+.desk { position: relative; height: 560px; margin-top: 10px; }
+.paper {
+  position: absolute; width: 250px; padding: 18px 18px 22px; background: #f4f1e8; color: #3b3a36; border-radius: 6px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45); font-size: 14px; line-height: 1.45; font-family: Georgia, serif; opacity: 0;
+}
+.paper b { display: block; font-family: var(--font); font-size: 13px; letter-spacing: .08em; color: #8a3b12; margin-bottom: 6px; }
+.paper .bad { background: rgba(255,107,107,.35); border-radius: 3px; padding: 0 3px; }
+.slide.active .paper { animation: land 1s cubic-bezier(.2,.9,.25,1.2) forwards; animation-delay: var(--d); }
+@keyframes land { from { opacity: 0; transform: translate(var(--fx), -420px) rotate(var(--fr)); } to { opacity: 1; transform: rotate(var(--r)); } }
+.qmark { position: absolute; font-size: 64px; font-weight: 800; color: var(--saffron); opacity: 0; }
+.slide.active .qmark { animation: qfloat 3s ease-in-out infinite; animation-delay: var(--d); }
+@keyframes qfloat { 0% { opacity: 0; transform: translateY(10px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translateY(-40px); } }
+
+/* ---------- Big numbers ---------- */
+.stat { text-align: left; }
+.stat .num { font-size: 108px; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+.stat .lbl { font-size: 22px; color: var(--muted); margin-top: 10px; max-width: 420px; }
+
+/* ---------- Pain grid / comparison ---------- */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.icon { font-size: 40px; margin-bottom: 10px; }
+table.cmp { border-collapse: collapse; width: 100%; font-size: 21px; }
+table.cmp th, table.cmp td { padding: 14px 16px; border-bottom: 1px solid var(--line); text-align: center; }
+table.cmp th:first-child, table.cmp td:first-child { text-align: left; color: var(--muted); }
+table.cmp th { color: var(--text); font-size: 19px; }
+table.cmp .us { background: rgba(255,179,71,.08); color: var(--saffron); font-weight: 700; }
+.yes { color: var(--green); } .no { color: var(--red); opacity: .8; } .half { color: var(--saffron); }
+table.cmp td span { display: inline-block; opacity: 0; }
+.slide.active table.cmp td span { animation: pop .5s forwards; animation-delay: calc(var(--i) * 70ms + .4s); }
+
+/* ---------- Quote ---------- */
+.quote { font-size: 74px; font-weight: 800; line-height: 1.08; letter-spacing: -.02em; }
+.quote em { font-style: normal; }
+.strike { position: relative; color: var(--dim); }
+.strike::after { content: ""; position: absolute; left: -4px; right: -4px; top: 55%; height: 6px; background: var(--red); transform: scaleX(0); transform-origin: left; border-radius: 3px; }
+.slide.active .strike::after { animation: strike .6s ease forwards 1.1s; }
+@keyframes strike { to { transform: scaleX(1); } }
+
+/* ---------- Journey ---------- */
+.journey { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; align-items: start; }
+.step { text-align: center; }
+.step .n { width: 46px; height: 46px; border-radius: 50%; margin: 0 auto 10px; display: grid; place-items: center; font-weight: 800; background: var(--saffron); color: #1a1205; }
+.step h3 { font-size: 19px; margin-bottom: 4px; } .step p { font-size: 15px; }
+
+/* ---------- Demo placeholders ---------- */
+.shot { position: relative; border-radius: 26px; overflow: hidden; background: #0e1430; border: 2px dashed #3b4a85; display: grid; place-items: center; }
+.shot.phone { aspect-ratio: 9 / 19.5; border-radius: 34px; border: 10px solid #1b2240; border-style: solid; outline: 2px dashed #3b4a85; outline-offset: 6px; }
+.shot.wide { aspect-ratio: 16 / 9; }
+.shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot .ph { text-align: center; padding: 16px; color: var(--dim); font-size: 15px; line-height: 1.4; }
+.shot .ph .cam { font-size: 34px; display: block; margin-bottom: 6px; }
+.shot .ph code { font: 12px var(--mono); color: var(--teal); }
+.shot.loaded { border: none; outline: none; }
+.shot.phone.loaded { border: 10px solid #1b2240; }
+.caption { text-align: center; font-size: 16px; color: var(--muted); margin-top: 10px; }
+.journey .shot.phone { max-width: 190px; margin: 0 auto; }
+.demo-row .shot.phone { width: 260px; margin: 0 auto; }
+
+/* ---------- Architecture SVG ---------- */
+svg text { font-family: var(--font); }
+.flow { fill: none; stroke: var(--line); stroke-width: 2.5; }
+.flowlive { fill: none; stroke: url(#g2); stroke-width: 3; stroke-dasharray: 10 14; }
+.slide.active .flowlive { animation: dash 1.4s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -48; } }
+.node rect { fill: #17214a; stroke: #33448a; stroke-width: 2; }
+.node text { fill: var(--text); font-size: 19px; font-weight: 600; }
+.node .sub { fill: var(--muted); font-size: 14px; font-weight: 400; }
+.node.hot rect { stroke: var(--saffron); }
+.node.cool rect { stroke: var(--teal); }
+
+/* ---------- OCR scan ---------- */
+.scanbox { position: relative; width: 470px; height: 560px; background: #e9e5d8; color: #2e2d2a; border-radius: 8px; padding: 30px 30px; font-family: Georgia, serif; font-size: 17px; line-height: 1.7; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,.5); filter: contrast(.9) blur(.25px); transform: rotate(-1.2deg); }
+.scanbox .hdr { font-family: var(--font); font-weight: 700; letter-spacing: .1em; margin-bottom: 10px; color: #6b2d0c; }
+.scanline { position: absolute; left: 0; right: 0; height: 90px; top: -90px; background: linear-gradient(180deg, transparent, rgba(58,209,195,.45), transparent); }
+.slide.active .scanline { animation: scan 3.2s ease-in-out .6s infinite; }
+@keyframes scan { 0% { top: -90px; } 70% { top: 100%; } 100% { top: 100%; } }
+.ocrout { font: 16px/1.7 var(--mono); color: var(--teal); white-space: pre-wrap; min-height: 300px; }
+.bar { height: 34px; border-radius: 8px; background: rgba(255,255,255,.06); position: relative; overflow: hidden; margin: 6px 0 14px; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 8px; transition: width 1.4s cubic-bezier(.2,.8,.2,1); }
+.bar b { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; font-weight: 700; }
+.barlbl { font-size: 17px; color: var(--muted); display: flex; justify-content: space-between; }
+
+/* ---------- NLP highlighting ---------- */
+.doctext { font-size: 25px; line-height: 1.9; color: var(--text); }
+.hl { border-radius: 6px; padding: 1px 4px; transition: background .4s, box-shadow .4s; position: relative; }
+.hl.on.amt { background: rgba(255,179,71,.25); box-shadow: inset 0 -3px 0 var(--saffron); }
+.hl.on.dt { background: rgba(110,168,255,.25); box-shadow: inset 0 -3px 0 var(--blue); }
+.hl.on.id { background: rgba(58,209,195,.25); box-shadow: inset 0 -3px 0 var(--teal); }
+.hl.on.pty { background: rgba(177,140,255,.22); box-shadow: inset 0 -3px 0 var(--violet); }
+.hl.on.term { background: rgba(74,222,128,.18); box-shadow: inset 0 -3px 0 var(--green); }
+.legend span { margin-right: 18px; font-size: 17px; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 6px; vertical-align: -1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { padding: 8px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 18px; opacity: 0; transform: translateY(10px); transition: all .5s; }
+.chip.on { opacity: 1; transform: none; }
+.chip .ok { color: var(--green); font-weight: 700; }
+
+/* ---------- Verification ---------- */
+.claim { display: flex; align-items: center; gap: 16px; padding: 18px 22px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); font-size: 22px; transition: all .6s; }
+.claim .st { margin-left: auto; font-weight: 700; font-size: 18px; opacity: 0; transition: opacity .4s; }
+.claim.ok { border-color: var(--green); } .claim.ok .st { opacity: 1; color: var(--green); }
+.claim.drop { border-color: var(--red); } .claim.drop .st { opacity: 1; color: var(--red); }
+.claim.gone { opacity: .25; transform: translateX(40px); text-decoration: line-through; }
+
+/* ---------- Conflict ---------- */
+.mini { background: #f4f1e8; color: #3b3a36; border-radius: 10px; padding: 22px 24px; font-family: Georgia, serif; font-size: 19px; line-height: 1.6; box-shadow: 0 20px 40px rgba(0,0,0,.4); }
+.mini b { font-family: var(--font); color: #8a3b12; letter-spacing: .08em; font-size: 14px; display: block; margin-bottom: 6px; }
+.mini .x { border-radius: 4px; padding: 0 4px; transition: all .5s; }
+.mini .x.on { background: rgba(255,107,107,.4); box-shadow: 0 0 0 3px rgba(255,107,107,.6); }
+.flag { border-left: 5px solid var(--red); background: rgba(255,107,107,.08); padding: 16px 20px; border-radius: 10px; font-size: 20px; color: var(--text); opacity: 0; transform: translateY(10px); transition: all .6s; }
+.flag.on { opacity: 1; transform: none; }
+.flag small { display: block; color: var(--muted); font-size: 15px; margin-top: 4px; }
+#conflictSvg line { stroke: var(--red); stroke-width: 3; stroke-dasharray: 8 8; opacity: 0; transition: opacity .5s; }
+#conflictSvg line.on { opacity: 1; animation: dash 1s linear infinite; }
+
+/* ---------- Provenance chips ---------- */
+.fact { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 21px; }
+.src-chip { font-size: 15px; padding: 4px 10px; border-radius: 8px; font-weight: 600; }
+.sc-doc { background: rgba(58,209,195,.15); color: var(--teal); }
+.sc-user { background: rgba(110,168,255,.15); color: var(--blue); }
+.sc-un { background: rgba(255,107,107,.15); color: var(--red); }
+
+/* ---------- Explained card / language toggle ---------- */
+.langs { display: flex; gap: 10px; margin-bottom: 14px; }
+.langs span { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); font-size: 17px; color: var(--muted); transition: all .4s; }
+.langs span.on { background: var(--saffron); color: #1a1205; border-color: var(--saffron); font-weight: 700; }
+.explain { font-size: 23px; line-height: 1.6; color: var(--text); min-height: 150px; transition: opacity .35s; }
+.term { padding: 16px 18px; border-radius: 14px; background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.35); }
+.term h4 { font-size: 20px; color: var(--green); margin-bottom: 4px; }
+.term p { font-size: 17px; }
+
+/* ---------- Search merge ---------- */
+.lst { display: flex; flex-direction: column; gap: 10px; }
+.it { padding: 12px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 18px; transition: all .7s cubic-bezier(.2,.8,.2,1); }
+.it.k { border-color: rgba(110,168,255,.6); } .it.s { border-color: rgba(58,209,195,.6); } .it.m { border-color: var(--saffron); background: rgba(255,179,71,.08); }
+.funnel { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.funnel div { height: 58px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; font-weight: 600; color: #0b1020; opacity: 0; transform: scaleX(.3); transition: all .8s cubic-bezier(.2,.8,.2,1); }
+.funnel div.on { opacity: 1; transform: none; }
+
+/* ---------- Chat ---------- */
+.phonechat { width: 520px; height: 590px; border-radius: 40px; background: #0d1330; border: 10px solid #1b2240; padding: 22px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 30px 70px rgba(0,0,0,.55); }
+.bub { max-width: 88%; padding: 11px 15px; border-radius: 18px; font-size: 17px; line-height: 1.45; opacity: 0; transform: translateY(10px); transition: all .5s; }
+.bub.on { opacity: 1; transform: none; }
+.bub.me { align-self: flex-end; background: #2b3f8f; border-bottom-right-radius: 6px; }
+.bub.bot { align-self: flex-start; background: #1a2550; border-bottom-left-radius: 6px; }
+.mention { color: var(--saffron); font-weight: 700; }
+.cite { display: inline-block; padding: 1px 8px; border-radius: 8px; background: rgba(58,209,195,.18); color: var(--teal); font-size: 15px; font-weight: 600; }
+.sources { margin-top: 10px; padding-top: 8px; border-top: 1px solid #2f3c78; font-size: 14px; color: var(--muted); opacity: 0; transition: opacity .6s; }
+.sources.on { opacity: 1; }
+.typing::after { content: "▍"; color: var(--teal); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- Brief stack ---------- */
+.brief { display: flex; flex-direction: column; gap: 9px; }
+.brief div { padding: 12px 18px; border-radius: 10px; font-size: 19px; display: flex; gap: 12px; align-items: center; }
+.b-doc { background: rgba(58,209,195,.12); border-left: 5px solid var(--teal); }
+.b-user { background: rgba(110,168,255,.12); border-left: 5px solid var(--blue); }
+.b-gap { background: rgba(255,107,107,.12); border-left: 5px solid var(--red); }
+.b-law { background: rgba(177,140,255,.12); border-left: 5px solid var(--violet); }
+.b-ai { background: rgba(255,179,71,.10); border-left: 5px solid var(--saffron); }
+
+/* ---------- Guard ---------- */
+.shield { width: 230px; height: 260px; }
+.shield path { fill: rgba(58,209,195,.08); stroke: var(--teal); stroke-width: 4; stroke-dasharray: 900; stroke-dashoffset: 900; }
+.slide.active .shield path { animation: draw 2s ease forwards .3s; }
+.help { display: inline-flex; gap: 10px; align-items: baseline; padding: 10px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 19px; }
+.help b { font: 700 26px var(--mono); color: var(--saffron); }
+
+/* ---------- Timeline (updates) ---------- */
+.tl { position: relative; height: 140px; margin: 30px 0 10px; }
+.tl::before { content: ""; position: absolute; left: 0; right: 0; top: 60px; height: 3px; background: var(--line); }
+.tl .pt { position: absolute; top: 44px; width: 34px; height: 34px; border-radius: 50%; background: var(--panel); border: 3px solid var(--teal); display: grid; place-items: center; font-size: 15px; opacity: 0; }
+.slide.active .tl .pt { animation: pop .5s forwards; animation-delay: var(--d); }
+.tl .pt.new { border-color: var(--saffron); box-shadow: 0 0 0 8px rgba(255,179,71,.15); }
+.tl .lab { position: absolute; top: 92px; transform: translateX(-30%); font-size: 14px; color: var(--muted); white-space: nowrap; }
+
+/* ---------- Results bars ---------- */
+.res { display: grid; grid-template-columns: 360px 1fr; gap: 10px 22px; align-items: center; }
+.res .k { font-size: 19px; color: var(--muted); }
+.res .bar { margin: 0; height: 38px; }
+
+/* ---------- Chapter slides ---------- */
+.chapter-slide { justify-content: center; }
+.chapter-slide .big { font-size: 170px; font-weight: 800; line-height: .9; letter-spacing: -.04em; opacity: .12; position: absolute; right: 90px; bottom: 60px; }
+
+/* ---------- Mobile / small windows: the stage just scales ---------- */
+</style>
+</head>
+<body>
+<canvas id="bgcanvas"></canvas>
+<div id="progress"></div>
+<div id="chapter"></div>
+<div id="counter"></div>
+<div id="hint">→ next · ← back · N notes · F fullscreen</div>
+<div id="notes"><h4>Speaker notes</h4><div id="notesBody"></div></div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#3ad1c3"/></linearGradient>
+    <linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#3ad1c3"/></linearGradient>
+  </defs>
+</svg>
+
+<div id="viewport"><div id="stage">
+
+<!-- ===================================================== 1. TITLE -->
+<section class="slide center" data-chapter="NyayaSathi AI">
+  <svg class="emblem r pop" viewBox="0 0 210 210" style="--d:.1s">
+    <circle class="ring" cx="105" cy="105" r="100"/>
+    <line x1="105" y1="40" x2="105" y2="160" stroke="#3ad1c3" stroke-width="4"/>
+    <line x1="75" y1="165" x2="135" y2="165" stroke="#3ad1c3" stroke-width="5" stroke-linecap="round"/>
+    <g class="beam"><line x1="45" y1="70" x2="165" y2="70"/>
+      <path class="pan" d="M45 70 L30 110 Q45 122 60 110 Z"/><path class="pan" d="M165 70 L150 110 Q165 122 180 110 Z"/></g>
+  </svg>
+  <div class="kicker r" style="--d:.3s">Legal document analysis using NLP</div>
+  <h1 class="title-word" id="titleWord">NyayaSathi AI</h1>
+  <p class="lead r" style="--d:1.4s; margin-top:22px; max-width:1100px">From a pile of property papers to a case you can understand, check and explain.</p>
+  <p class="small r" style="--d:1.8s; margin-top:40px">[Team member names] · [Guide name] · [College / Department] · [Date]</p>
+  <aside class="notes">Open calmly. "This project is about one of the most common and painful legal problems in India: property disputes, and the stack of documents that comes with them." Pause, then move to Meera.</aside>
+</section>
+
+<!-- ===================================================== 2. MEET MEERA -->
+<section class="slide" data-chapter="Act 1 · The problem">
+  <div class="kicker r">A story, not a statistic</div>
+  <h2 class="r" style="--d:.1s">Meet Meera.</h2>
+  <p class="lead r" style="--d:.25s; max-width:1250px">She is a schoolteacher in Pune. In 2023 she agreed to buy a small plot, the first property her family would ever own.</p>
+  <div class="story">
+    <div class="beat r" style="--d:.6s"><div class="dot">✍️</div><h3>Signs the agreement</h3><p>Agreement to sell, plot survey no. 123/4</p></div>
+    <div class="beat r" style="--d:1.1s"><div class="dot">💸</div><h3>Pays ₹5,00,000</h3><p>Advance by cheque; gets a receipt</p></div>
+    <div class="beat bad r" style="--d:1.6s"><div class="dot">😟</div><h3>Hears a rumour</h3><p>The seller has agreed to sell the same plot to someone else</p></div>
+    <div class="beat bad r" style="--d:2.1s"><div class="dot">📨</div><h3>Sends a legal notice</h3><p>And now has a file full of papers she can't make sense of</p></div>
+  </div>
+  <p class="small r" style="--d:2.6s; margin-top:auto">Meera and every detail of her case are fictional. Her situation is not.</p>
+  <aside class="notes">Tell it as a story. Emphasise: she is not a lawyer, she has documents, and she doesn't know what they prove or what's missing. This is the user we built for.</aside>
+</section>
+
+<!-- ===================================================== 3. THE PILE -->
+<section class="slide" data-chapter="Act 1 · The problem">
+  <div class="kicker r">What Meera actually has</div>
+  <h2 class="r" style="--d:.1s">A pile of papers. No clarity.</h2>
+  <div class="desk">
+    <div class="paper" style="left:30px;top:40px;--r:-6deg;--fr:-30deg;--fx:-200px;--d:.3s"><b>AGREEMENT TO SELL</b>…plot bearing Survey No. 123/4… total sale consideration Rs. 45,00,000/-… advance of Rs. 5,00,000/-…</div>
+    <div class="paper" style="left:330px;top:120px;--r:4deg;--fr:40deg;--fx:100px;--d:.55s"><b>RECEIPT</b>Received from Meera Iyer a sum of <span class="bad">Rs. 5,50,000/-</span>… Survey No. <span class="bad">123/A</span>…</div>
+    <div class="paper" style="left:640px;top:30px;--r:-3deg;--fr:-50deg;--fx:300px;--d:.8s"><b>LEGAL NOTICE</b>…calls upon you to execute the sale deed within 15 days… failing which…</div>
+    <div class="paper deva" style="left:930px;top:140px;--r:7deg;--fr:30deg;--fx:400px;--d:1.05s"><b>रसीद</b>अग्रिम राशि रुपये ५,००,००० चेक संख्या ००४५१२ द्वारा प्राप्त हुई…</div>
+    <div class="paper" style="left:1180px;top:20px;--r:-8deg;--fr:-20deg;--fx:500px;--d:1.3s;filter:blur(.6px) contrast(.8)"><b>PHOTO OF A PAGE</b>(a blurry phone photo of the stamp paper, taken at an angle)</div>
+    <div class="qmark" style="left:250px;top:330px;--d:1.8s">?</div>
+    <div class="qmark" style="left:820px;top:360px;--d:2.3s">?</div>
+    <div class="qmark" style="left:1200px;top:300px;--d:2.8s">?</div>
+    <div class="card r" style="--d:2s; position:absolute; left:120px; right:120px; bottom:0; text-align:center">
+      <p class="lead">Is the receipt for the same plot? Why are the amounts different? What's missing? What should she take to an advocate?</p>
+    </div>
+  </div>
+  <aside class="notes">Point at the red highlights: the receipt says 5,50,000 and survey 123/A while the agreement says 5,00,000 and 123/4. Meera didn't notice. Most people wouldn't. Also: one document is in Hindi and one is a blurry photo. That's realistic.</aside>
+</section>
+
+<!-- ===================================================== 4. SCALE -->
+<section class="slide" data-chapter="Act 1 · The problem">
+  <div class="kicker r">Meera is not alone</div>
+  <h2 class="r" style="--d:.1s">The problem is enormous.</h2>
+  <div class="row" style="gap:70px; margin-top:20px">
+    <div class="stat r" style="--d:.3s"><div class="num grad"><span class="count" data-to="5" data-suffix=" crore+">0</span></div><div class="lbl">cases pending across Indian courts</div></div>
+    <div class="stat r" style="--d:.6s"><div class="num grad"><span class="count" data-to="66" data-suffix="%">0</span></div><div class="lbl">of civil cases relate to land or property disputes</div></div>
+    <div class="stat r" style="--d:.9s"><div class="num grad">2</div><div class="lbl">scripts in the same file: English and Hindi, typed, scanned or photographed</div></div>
+  </div>
+  <p class="lead r" style="--d:1.3s; margin-top:60px; max-width:1300px">Property disputes are long, document-heavy and expensive, and the first step, <span class="t-saffron">organising the papers</span>, falls on people who are not lawyers.</p>
+  <div class="src">Sources: National Judicial Data Grid (pending cases); DAKSH Access to Justice survey (share of civil cases on land/property). Check the current figures before presenting.</div>
+  <aside class="notes">Verify both figures from NJDG and DAKSH on the day; if the numbers have changed, update the counters (data-to). The point: this is the most common kind of civil litigation, and the paperwork burden starts long before court.</aside>
+</section>
+
+<!-- ===================================================== 5. WHY HARD -->
+<section class="slide" data-chapter="Act 1 · The problem">
+  <div class="kicker r">Why it's hard</div>
+  <h2 class="r" style="--d:.1s">Five problems hide inside that pile.</h2>
+  <div class="grid3">
+    <div class="card r" style="--d:.3s"><div class="icon">🗂️</div><h3>Scattered</h3><p>Agreements, receipts, notices, land records: different formats, some scanned, some photos.</p></div>
+    <div class="card r" style="--d:.45s"><div class="icon">🔍</div><h3>Contradictions hide in details</h3><p>123/4 vs 123/A. ₹5,00,000 vs ₹5,50,000. Easy to miss, important to catch.</p></div>
+    <div class="card r" style="--d:.6s"><div class="icon">🕳️</div><h3>Gaps are invisible</h3><p>"Annexure A attached." Was it? What should exist but doesn't?</p></div>
+    <div class="card r" style="--d:.75s"><div class="icon">📜</div><h3>Legal language</h3><p>Earnest money, specific performance, mutation, khasra: words that decide outcomes, explained nowhere.</p></div>
+    <div class="card r" style="--d:.9s"><div class="icon">🤖</div><h3>Chatbots make things up</h3><p>Generic AI invents judgments, sections and amounts, and sounds confident doing it.</p></div>
+    <div class="card r" style="--d:1.05s; border-color:var(--saffron)"><div class="icon">⚖️</div><h3>Lawyers are essential, and costly</h3><p>Their time is best spent on strategy, not on sorting papers.</p></div>
+  </div>
+  <aside class="notes">Spend a moment on "chatbots make things up". This is why the whole design is about verification, not just generation.</aside>
+</section>
+
+<!-- ===================================================== 6. EXISTING -->
+<section class="slide" data-chapter="Act 1 · The problem">
+  <div class="kicker r">What exists today</div>
+  <h2 class="r" style="--d:.1s">Everyone solves a piece. Nobody solves Meera's.</h2>
+  <table class="cmp r" style="--d:.2s">
+    <tr><th></th><th>Generic AI chatbot</th><th>Legal databases</th><th>Advocate</th><th class="us">NyayaSathi</th></tr>
+    <tr><td>Reads <em>your</em> documents</td><td><span class="half" style="--i:1">partly</span></td><td><span class="no" style="--i:2">✗</span></td><td><span class="yes" style="--i:3">✓</span></td><td class="us"><span style="--i:4">✓</span></td></tr>
+    <tr><td>Finds contradictions between them</td><td><span class="no" style="--i:5">✗</span></td><td><span class="no" style="--i:6">✗</span></td><td><span class="yes" style="--i:7">✓</span></td><td class="us"><span style="--i:8">✓</span></td></tr>
+    <tr><td>Real Indian judgments</td><td><span class="no" style="--i:9">invents</span></td><td><span class="yes" style="--i:10">✓</span></td><td><span class="yes" style="--i:11">✓</span></td><td class="us"><span style="--i:12">✓</span></td></tr>
+    <tr><td>Every claim linked to a page</td><td><span class="no" style="--i:13">✗</span></td><td><span class="half" style="--i:14">n/a</span></td><td><span class="half" style="--i:15">by hand</span></td><td class="us"><span style="--i:16">✓</span></td></tr>
+    <tr><td>Plain language, English / Hindi / Hinglish</td><td><span class="half" style="--i:17">yes, unchecked</span></td><td><span class="no" style="--i:18">✗</span></td><td><span class="yes" style="--i:19">✓</span></td><td class="us"><span style="--i:20">✓</span></td></tr>
+    <tr><td>Available at 11 pm, free</td><td><span class="yes" style="--i:21">✓</span></td><td><span class="half" style="--i:22">paid</span></td><td><span class="no" style="--i:23">✗</span></td><td class="us"><span style="--i:24">✓</span></td></tr>
+  </table>
+  <p class="small r" style="--d:2.2s; margin-top:22px">We sit <b>before</b> the advocate, not instead of one.</p>
+  <aside class="notes">Be fair to each column. The pitch isn't "replace lawyers". It's "arrive at the lawyer prepared".</aside>
+</section>
+
+<!-- ===================================================== 7. INSIGHT -->
+<section class="slide center" data-chapter="Act 2 · The insight">
+  <div class="kicker r">The insight</div>
+  <div class="quote r" style="--d:.2s">People don't need an AI that <span class="strike">predicts who wins</span>.<br>They need one that helps them <em class="grad">prepare</em>.</div>
+  <p class="lead r" style="--d:1.8s; margin-top:44px; max-width:1200px">And an AI used for legal preparation is only useful if it can be <span class="t-teal">trusted</span>: every claim must point to where it came from.</p>
+  <aside class="notes">This is the turning point of the talk. Prediction is unreliable and risky; preparation is valuable and checkable.</aside>
+</section>
+
+<!-- ===================================================== 8. PRINCIPLES -->
+<section class="slide" data-chapter="Act 2 · The insight">
+  <div class="kicker r">Four promises we designed around</div>
+  <h2 class="r" style="--d:.1s">Built on trust, not on confidence.</h2>
+  <div class="grid4">
+    <div class="card r pop" style="--d:.3s"><div class="icon">📍</div><h3>Grounded</h3><p>Every fact points to a document page, every legal point to a real judgment.</p></div>
+    <div class="card r pop" style="--d:.5s"><div class="icon">✅</div><h3>Verified</h3><p>The AI proposes; our checks verify. Unproven claims are marked or removed.</p></div>
+    <div class="card r pop" style="--d:.7s"><div class="icon">🤝</div><h3>Honest</h3><p>"Not found in your documents" is not "didn't happen". Conflicts are shown, never hidden.</p></div>
+    <div class="card r pop" style="--d:.9s"><div class="icon">🛡️</div><h3>Safe</h3><p>No help with illegal acts, helplines when someone is at risk, no outcome guarantees.</p></div>
+  </div>
+  <aside class="notes">Every technical slide that follows maps back to one of these four promises. Point at them again later.</aside>
+</section>
+
+<!-- ===================================================== 9. SOLUTION / JOURNEY -->
+<section class="slide" data-chapter="Act 3 · The solution">
+  <div class="kicker r">The solution</div>
+  <h2 class="r" style="--d:.1s">NyayaSathi turns Meera's pile into a case she can explain.</h2>
+  <div class="journey">
+    <div class="step r" style="--d:.3s"><div class="n">1</div><div class="shot phone" data-src="demo/02-new-case" data-label="Describe the case"></div><h3 style="margin-top:12px">Describe</h3><p>in her own words, or skip it</p></div>
+    <div class="step r" style="--d:.45s"><div class="n">2</div><div class="shot phone" data-src="demo/03-upload" data-label="Attach documents"></div><h3 style="margin-top:12px">Attach</h3><p>PDFs, scans, phone photos</p></div>
+    <div class="step r" style="--d:.6s"><div class="n">3</div><div class="shot phone" data-src="demo/04-explained" data-label="Each document explained"></div><h3 style="margin-top:12px">Understand</h3><p>each document in plain language</p></div>
+    <div class="step r" style="--d:.75s"><div class="n">4</div><div class="shot phone" data-src="demo/06-timeline" data-label="Timeline & conflicts"></div><h3 style="margin-top:12px">Check</h3><p>timeline, conflicts, gaps</p></div>
+    <div class="step r" style="--d:.9s"><div class="n">5</div><div class="shot phone" data-src="demo/09-chat-mention" data-label="Ask with @documents"></div><h3 style="margin-top:12px">Ask</h3><p>answers with sources</p></div>
+    <div class="step r" style="--d:1.05s"><div class="n">6</div><div class="shot phone" data-src="demo/10-brief" data-label="Case-preparation brief"></div><h3 style="margin-top:12px">Prepare</h3><p>a brief for her advocate</p></div>
+  </div>
+  <aside class="notes">This is the map of the demo. Name each step in one sentence; details come in Act 4.</aside>
+</section>
+
+<!-- ===================================================== 10. FEATURES -->
+<section class="slide" data-chapter="Act 3 · The solution">
+  <div class="kicker r">What we built</div>
+  <h2 class="r" style="--d:.1s">Nine features, one journey.</h2>
+  <div class="grid3">
+    <div class="card r" style="--d:.2s"><h3>📷 Reads anything</h3><p>Typed PDFs, scans and phone photos, in English and Hindi.</p></div>
+    <div class="card r" style="--d:.3s"><h3>🔎 Extracts the facts</h3><p>Parties, amounts, dates, survey/khasra numbers, clauses, each with its page.</p></div>
+    <div class="card r" style="--d:.4s"><h3>📖 Explains each document</h3><p>Summary, clause meanings and legal terms in English, हिन्दी or Hinglish.</p></div>
+    <div class="card r" style="--d:.5s"><h3>⚠️ Catches conflicts</h3><p>Different amounts, dates or survey numbers across documents; missing attachments.</p></div>
+    <div class="card r" style="--d:.6s"><h3>🧩 One case summary</h3><p>Built from her documents and her words, every item labelled with its source.</p></div>
+    <div class="card r" style="--d:.7s"><h3>⚖️ Finds real judgments</h3><p>Similar Supreme Court property judgments, with why they matter (High Courts next).</p></div>
+    <div class="card r" style="--d:.8s"><h3>💬 Chat that cites</h3><p>Ask in Hinglish, @mention a document; every answer lists its sources.</p></div>
+    <div class="card r" style="--d:.9s"><h3>📝 Preparation brief</h3><p>Facts, her account, gaps, legal sources and questions for the advocate.</p></div>
+    <div class="card r" style="--d:1s"><h3>🛡️ Safe by design</h3><p>Refuses illegal help, shows helplines, stays neutral, never promises outcomes.</p></div>
+  </div>
+  <aside class="notes">Keep this fast; it's a menu. "Let's look at how each of these actually works."</aside>
+</section>
+
+<!-- ===================================================== 11. CHAPTER: HOW -->
+<section class="slide chapter-slide" data-chapter="Act 4 · How it works">
+  <div class="kicker r">Act 4</div>
+  <h1 class="r" style="--d:.15s">How it works</h1>
+  <p class="lead r" style="--d:.35s; margin-top:20px; max-width:1100px">Follow one document, Meera's receipt, from a photo on her phone to a verified fact in her brief.</p>
+  <div class="big">04</div>
+  <aside class="notes">Transition into the technical part. Promise the audience a single thread: the receipt.</aside>
+</section>
+
+<!-- ===================================================== 12. ARCHITECTURE -->
+<section class="slide" data-chapter="Act 4 · How it works">
+  <div class="kicker r">Architecture</div>
+  <h2 class="r" style="--d:.1s">A mobile app, a verifying backend, and a legal memory.</h2>
+  <svg viewBox="0 0 1400 600" class="r" style="--d:.25s; width:100%; height:600px">
+    <path class="flow" d="M200 300 H330"/><path class="flowlive" d="M200 300 H330"/>
+    <path class="flow" d="M560 300 C610 300 610 110 660 110"/><path class="flowlive" d="M560 300 C610 300 610 110 660 110"/>
+    <path class="flow" d="M560 300 C610 300 610 230 660 230"/><path class="flowlive" d="M560 300 C610 300 610 230 660 230"/>
+    <path class="flow" d="M560 300 C610 300 610 350 660 350"/><path class="flowlive" d="M560 300 C610 300 610 350 660 350"/>
+    <path class="flow" d="M560 300 C610 300 610 470 660 470"/><path class="flowlive" d="M560 300 C610 300 610 470 660 470"/>
+    <path class="flow" d="M560 300 C610 300 610 565 660 565"/>
+    <path class="flow" d="M960 110 H1080"/><path class="flow" d="M960 350 H1080"/><path class="flow" d="M960 470 C1020 470 1020 520 1080 520"/>
+    <g class="node hot"><rect x="20" y="230" width="180" height="140" rx="22"/><text x="110" y="290" text-anchor="middle">📱 Android app</text><text class="sub" x="110" y="318" text-anchor="middle">Kotlin · Compose</text></g>
+    <g class="node"><rect x="330" y="220" width="230" height="160" rx="22"/><text x="445" y="285" text-anchor="middle">Backend API</text><text class="sub" x="445" y="312" text-anchor="middle">Python · FastAPI</text><text class="sub" x="445" y="336" text-anchor="middle">streams answers live</text></g>
+    <g class="node cool"><rect x="660" y="70" width="300" height="80" rx="18"/><text x="810" y="105" text-anchor="middle">Reading: text + OCR</text><text class="sub" x="810" y="130" text-anchor="middle">Tesseract · English + Hindi</text></g>
+    <g class="node cool"><rect x="660" y="190" width="300" height="80" rx="18"/><text x="810" y="225" text-anchor="middle">Understanding: hybrid NLP</text><text class="sub" x="810" y="250" text-anchor="middle">rules + LLM, verified in code</text></g>
+    <g class="node cool"><rect x="660" y="310" width="300" height="80" rx="18"/><text x="810" y="345" text-anchor="middle">Evidence & case facts</text><text class="sub" x="810" y="370" text-anchor="middle">conflicts · provenance</text></g>
+    <g class="node cool"><rect x="660" y="430" width="300" height="80" rx="18"/><text x="810" y="465" text-anchor="middle">Legal search (RAG)</text><text class="sub" x="810" y="490" text-anchor="middle">keywords + meaning, fused</text></g>
+    <g class="node"><rect x="660" y="540" width="300" height="50" rx="14"/><text x="810" y="572" text-anchor="middle" style="font-size:17px">Chat · Brief · Safety rules</text></g>
+    <g class="node"><rect x="1080" y="60" width="300" height="100" rx="18"/><text x="1230" y="102" text-anchor="middle">LLM (swappable)</text><text class="sub" x="1230" y="128" text-anchor="middle">any OpenAI-compatible model</text></g>
+    <g class="node"><rect x="1080" y="290" width="300" height="120" rx="18"/><text x="1230" y="335" text-anchor="middle">PostgreSQL + pgvector</text><text class="sub" x="1230" y="362" text-anchor="middle">cases, documents, judgments,</text><text class="sub" x="1230" y="384" text-anchor="middle">paragraph embeddings</text></g>
+    <g class="node"><rect x="1080" y="470" width="300" height="100" rx="18"/><text x="1230" y="512" text-anchor="middle">Court judgment datasets</text><text class="sub" x="1230" y="538" text-anchor="middle">Supreme Court · High Courts next</text></g>
+  </svg>
+  <aside class="notes">Three key decisions: (1) the LLM sits behind one adapter, so the provider can be swapped (free Gemini tier today, a local model tomorrow) and no API key is ever in the app; (2) one database for everything, including vectors, which means fewer moving parts; (3) heavy work runs in the background, so the app stays responsive.</aside>
+</section>
+
+<!-- ===================================================== 13. OCR -->
+<section class="slide" data-chapter="Act 4 · Reading">
+  <div class="kicker r">Step 1 · Reading</div>
+  <h2 class="r" style="--d:.1s">Turning a phone photo into text, without inventing a word.</h2>
+  <div class="row" style="gap:60px; align-items:flex-start">
+    <div class="scanbox r left" style="--d:.2s">
+      <div class="hdr">RECEIPT</div>
+      Date: 15/03/2023<br><br>Received from Meera Iyer a sum of Rs. 5,50,000/- by cheque no. 004512 towards advance for the sale of plot Survey No. 123/A, Village Wadgaon, Pune.<br><br>Received by: Ravi Kulkarni
+      <div class="scanline"></div>
+    </div>
+    <div class="grow col">
+      <div class="ocrout card r right" style="--d:.4s" id="ocrOut"></div>
+      <div class="r" style="--d:.8s">
+        <p class="small" style="margin-bottom:8px">We benchmarked two OCR engines on the same scans. The winner:</p>
+        <div class="barlbl"><span>Tesseract: Hindi key values on clean & phone-photo scans</span><span class="t-green">100%</span></div>
+        <div class="bar"><i style="background:var(--green)" data-w="100%"></i></div>
+        <div class="barlbl"><span>Speed: Tesseract 0.5 s/page vs PaddleOCR ~26 s/page</span><span class="t-green">~40× faster</span></div>
+        <div class="bar"><i style="background:var(--teal)" data-w="96%"></i></div>
+        <div class="barlbl"><span>Memory: ~0.1 GB vs up to ~15 GB on a 16 GB laptop</span><span class="t-green">runs anywhere</span></div>
+        <div class="bar"><i style="background:var(--blue)" data-w="99%"></i></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">Technical points: only pages without selectable text are OCR'd; OCR text is stored exactly as read, never "corrected" by AI; every page keeps a confidence score; low-confidence pages are flagged; a noisy page is automatically re-read after denoising (on degraded scans, key values went from 36% to 50% in English and from 20% to 50% in Hindi). We chose Tesseract over PaddleOCR by measurement: PaddleOCR's English model couldn't read Hindi at all, its Hindi model got 70% vs Tesseract's 100%, and it needed about 15 GB of RAM.</aside>
+</section>
+
+<!-- ===================================================== 14. NLP -->
+<section class="slide" data-chapter="Act 4 · Understanding">
+  <div class="kicker r">Step 2 · Understanding</div>
+  <h2 class="r" style="--d:.1s">Hybrid NLP: precise rules + a language model.</h2>
+  <div class="card r" style="--d:.2s">
+    <div class="doctext" id="nlpText">
+      This Agreement to Sell is made on <span class="hl dt">15 March 2023</span> between <span class="hl pty">Ravi Kulkarni</span> (the SELLER) and <span class="hl pty">Meera Iyer</span>. The plot bearing <span class="hl id">Survey No. 123/4</span> is sold for a total <span class="hl term">sale consideration</span> of <span class="hl amt">Rs. 45,00,000/-</span>, of which an <span class="hl term">advance</span> of <span class="hl amt">Rs. 5,00,000/-</span> is paid. <span class="deva">… <span class="hl id">सर्वे नंबर १२३/४</span> … <span class="hl amt">रुपये ५ लाख</span> …</span>
+    </div>
+    <div class="legend" style="margin-top:14px">
+      <span><i style="background:var(--saffron)"></i>amounts</span><span><i style="background:var(--blue)"></i>dates</span><span><i style="background:var(--teal)"></i>property ids</span><span><i style="background:var(--violet)"></i>parties</span><span><i style="background:var(--green)"></i>legal terms</span>
+    </div>
+  </div>
+  <div class="row" style="margin-top:24px">
+    <div class="card grow r" style="--d:.5s"><h3 class="t-saffron">Rules (deterministic)</h3><p>Indian formats: lakh/crore, ₹/Rs/रुपये, Devanagari digits, survey/khasra numbers, Hindi month names. Can't invent anything.</p></div>
+    <div class="card grow r" style="--d:.7s"><h3 class="t-teal">Language model (structured)</h3><p>Reads meaning: who is the seller, which amount is the advance, what each clause says. Output must fit a strict schema.</p></div>
+    <div class="card grow r" style="--d:.9s"><h3 class="t-green">Cross-check</h3><p>Found by both → <b>corroborated</b>. Found only by the rules → <b>"possibly missed"</b> flag. Nothing silently disappears.</p></div>
+  </div>
+  <aside class="notes">This is the heart of "NLP" in our project: information extraction combining rule-based extraction (regex grammars for Indian legal formats) with LLM structured extraction, then agreement checking. Rules give precision and guarantees; the model gives understanding.</aside>
+</section>
+
+<!-- ===================================================== 15. VERIFY -->
+<section class="slide" data-chapter="Act 4 · Verification">
+  <div class="kicker r">Our core idea</div>
+  <h2 class="r" style="--d:.1s">The model proposes. <span class="grad">The code verifies.</span></h2>
+  <div class="col" style="max-width:1250px; margin-top:10px" id="verifyList">
+    <div class="claim" data-state="ok"><span>💬</span>"The total price is Rs. 45,00,000." <span class="small">quote found on page 1</span><span class="st">✓ KEPT</span></div>
+    <div class="claim" data-state="drop"><span>💬</span>"The advance was Rs. 7,00,000." <span class="small">₹7,00,000 appears nowhere in the document</span><span class="st">✗ DROPPED</span></div>
+    <div class="claim" data-state="drop"><span>💬</span>"You will definitely win this case." <span class="small">advice / outcome claim</span><span class="st">✗ DROPPED</span></div>
+    <div class="claim" data-state="ok"><span>📄</span>Source "receipt.pdf, page 1" <span class="small">page exists, amount is on it</span><span class="st">✓ VERIFIED</span></div>
+    <div class="claim" data-state="drop"><span>📄</span>Source "receipt.pdf, page 9" <span class="small">page doesn't exist</span><span class="st">✗ REMOVED</span></div>
+    <div class="claim" data-state="ok"><span>⚖️</span>Judgment cited in chat <span class="small">was actually retrieved in this conversation</span><span class="st">✓ LINKED</span></div>
+  </div>
+  <aside class="notes">Five layers: (1) strict output schemas; (2) quotes must exist on the cited page; (3) any amount, date or survey number in an AI statement must exist in the document, or the statement is dropped; (4) advice and outcome language is filtered; (5) citations to judgments or pages are checked against what was actually retrieved or uploaded. Unverified items are shown as unverified, not hidden.</aside>
+</section>
+
+<!-- ===================================================== 16. CONFLICTS -->
+<section class="slide" data-chapter="Act 4 · Evidence">
+  <div class="kicker r">Step 3 · Checking</div>
+  <h2 class="r" style="--d:.1s">The detail Meera missed, found in a second.</h2>
+  <div class="row" style="position:relative; gap:120px">
+    <div class="mini grow r left" style="--d:.2s"><b>AGREEMENT TO SELL · page 1</b>…plot bearing Survey No. <span class="x" id="c1">123/4</span>… advance of <span class="x" id="c2">Rs. 5,00,000/-</span>…</div>
+    <div class="mini grow r right" style="--d:.35s"><b>RECEIPT · page 1</b>…a sum of <span class="x" id="c3">Rs. 5,50,000/-</span>… Survey No. <span class="x" id="c4">123/A</span>…</div>
+  </div>
+  <div class="col" style="margin-top:30px; gap:14px">
+    <div class="flag" id="f1">⚠️ Different survey numbers appear: 123/4 (agreement p.1), 123/A (receipt p.1). This may be a typo, a different property, or a real discrepancy; check the originals.<small>Links to both pages · wording never says "fraud"</small></div>
+    <div class="flag" id="f2">⚠️ The advance is stated differently: Rs. 5,00,000/- vs Rs. 5,50,000/-. Check which figure each document refers to.<small>"Rs 5 lakh" = "Rs. 5,00,000/-" = "रुपये ५,००,०००": same value, no false alarm</small></div>
+    <div class="flag" id="f3" style="border-color:var(--saffron); background:rgba(255,179,71,.08)">📎 "Annexure A" is mentioned in the agreement but wasn't uploaded.<small>Gaps are said as "not found in your documents", not "didn't happen"</small></div>
+  </div>
+  <aside class="notes">This part is deliberately rule-based, with no AI, so it's reproducible and explainable. The hard part is normalisation: Indian number formats, Devanagari digits and identifier spellings. Our evaluation planted 163 such discrepancies; all were caught, with zero false alarms.</aside>
+</section>
+
+<!-- ===================================================== 17. PROVENANCE -->
+<section class="slide" data-chapter="Act 4 · Case facts">
+  <div class="kicker r">Step 4 · One source of truth</div>
+  <h2 class="r" style="--d:.1s">Her words + her documents → one case summary, every line labelled.</h2>
+  <div class="row" style="gap:40px">
+    <div class="card grow r" style="--d:.2s; padding:10px 0">
+      <div class="fact"><span>Seller: Ravi Kulkarni</span><span class="src-chip sc-doc" style="margin-left:auto">agreement p.1</span><span class="src-chip sc-user">you said</span></div>
+      <div class="fact"><span>Advance: Rs. 5,50,000/-</span><span class="src-chip sc-doc" style="margin-left:auto">receipt p.1</span></div>
+      <div class="fact"><span>Agreement signed: 15 March 2023</span><span class="src-chip sc-doc" style="margin-left:auto">agreement p.1</span><span class="src-chip sc-user">you said</span></div>
+      <div class="fact"><span>Heard the plot was sold again (Jan 2024)</span><span class="src-chip sc-user" style="margin-left:auto">you said</span></div>
+      <div class="fact"><span>Buyer number two: "Sunil Patil"</span><span class="src-chip sc-un" style="margin-left:auto">source not confirmed</span></div>
+      <div class="fact" style="border:none; color:var(--red)"><span>⚠️ Advance: <b>you said ₹6 lakh</b>; <b>receipt says ₹5,50,000</b></span><span class="src-chip sc-un" style="margin-left:auto">check</span></div>
+    </div>
+    <div class="col" style="width:470px">
+      <div class="card r" style="--d:.5s"><h3>Documents are the primary record</h3><p>Names, dates, amounts and survey numbers come from the papers; her account adds context.</p></div>
+      <div class="card r" style="--d:.7s"><h3>Every source is checked</h3><p>The page must exist and actually contain the value; otherwise the item is "not confirmed".</p></div>
+      <div class="card r" style="--d:.9s"><h3>Conflicts are kept</h3><p>Never silently resolved. Follow-up questions ask her to confirm them.</p></div>
+    </div>
+  </div>
+  <aside class="notes">This feature answers "what is the basis of the case?": a fused fact sheet with provenance. It also works with documents only, no typing needed. Our evaluation offered the checker 600 correct and 800 bad source references; it kept every correct one and none of the bad ones.</aside>
+</section>
+
+<!-- ===================================================== 18. EXPLAINED -->
+<section class="slide" data-chapter="Act 4 · Document understanding">
+  <div class="kicker r">Step 5 · Explaining</div>
+  <h2 class="r" style="--d:.1s">Every document, explained like a patient friend would.</h2>
+  <div class="row" style="gap:40px">
+    <div class="card grow r" style="--d:.2s">
+      <div class="langs" id="langs"><span class="on">English</span><span class="deva">हिन्दी</span><span>Hinglish</span></div>
+      <div class="explain" id="explainText"></div>
+      <div class="chips" style="margin-top:14px"><span class="chip on">p.1</span><span class="chip on"><span class="ok">✓</span> quote found on page</span></div>
+    </div>
+    <div class="col" style="width:520px">
+      <div class="term r" style="--d:.5s"><h4>Earnest money / advance · <span class="deva">बयाना</span></h4><p>A part payment made to show the buyer is serious. Whether it's refunded depends on the agreement and circumstances.</p></div>
+      <div class="term r" style="--d:.7s"><h4>Specific performance · <span class="deva">विशिष्ट पालन</span></h4><p>A court order to actually complete the promised sale, not just pay compensation.</p></div>
+      <div class="term r" style="--d:.9s"><h4>Khasra / khatauni · <span class="deva">खसरा / खतौनी</span></h4><p>North Indian land records: plot number and recorded holders, not by themselves proof of ownership.</p></div>
+    </div>
+  </div>
+  <p class="small r" style="--d:1.1s; margin-top:16px">46 curated legal terms with Hindi names · definitions written and reviewed by us, not generated · terms detected by dictionary matching · type and language identified by rules</p>
+  <aside class="notes">Technical: term spotting is dictionary-based NLP over English and Hindi variants; definitions come from our curated glossary, so they never drift. The language model writes the plain-language summary in the chosen language, and every point goes through the same verification as before. Language identification separates English, Hindi and Hinglish (Roman-script Hindi).</aside>
+</section>
+
+<!-- ===================================================== 19. SEARCH -->
+<section class="slide" data-chapter="Act 4 · Legal search">
+  <div class="kicker r">Step 6 · Finding the law</div>
+  <h2 class="r" style="--d:.1s">Real judgments, found two ways and fused.</h2>
+  <div class="row" style="gap:36px; align-items:flex-start">
+    <div class="col grow r" style="--d:.2s">
+      <h3 class="t-blue">Keyword search</h3>
+      <div class="lst" id="kw"><div class="it k">"specific performance" + "advance"</div><div class="it k">Section 54, Transfer of Property Act</div><div class="it k">"agreement to sell" + "refund"</div></div>
+    </div>
+    <div class="col grow r" style="--d:.35s">
+      <h3 class="t-teal">Meaning search (embeddings)</h3>
+      <div class="lst" id="sm"><div class="it s">"seller sold plot to another buyer"</div><div class="it s">"buyer ready and willing to pay"</div><div class="it s">"double sale of the same land"</div></div>
+    </div>
+    <div class="col grow r" style="--d:.5s">
+      <h3 class="t-saffron">Fused + explained</h3>
+      <div class="lst" id="fz"><div class="it m">1 · supports · 82% match</div><div class="it m">2 · mixed · 71% match</div><div class="it m">3 · opposes · 64% match</div></div>
+      <p class="small">(illustrative) Each: similarities, differences, key paragraphs; only judgments actually retrieved can be cited.</p>
+    </div>
+  </div>
+  <div class="row" style="margin-top:26px; gap:30px; align-items:center">
+    <div class="funnel r" style="--d:.6s; width:560px" id="funnel">
+      <div style="width:560px;background:#6ea8ff">All Supreme Court + High Court judgments</div>
+      <div style="width:440px;background:#3ad1c3">Metadata filter: case type, acts, headnotes</div>
+      <div style="width:320px;background:#4ade80">Full-text scoring + exclusions</div>
+      <div style="width:210px;background:#ffb347">Property & land only</div>
+    </div>
+    <p class="grow r" style="--d:.8s">The legal memory holds <b>only property and land disputes</b>, filtered in stages, and <b>updates itself</b> with one command, run weekly. In a trial on 2024: 154 of 782 Supreme Court judgments kept.</p>
+  </div>
+  <aside class="notes">Hybrid retrieval: full-text search catches exact legal terms; embeddings catch meaning; the two ranked lists are merged with Reciprocal Rank Fusion; then the model explains relevance (supports / opposes / mixed), restricted to the retrieved candidates. Corpus: public Supreme Court and High Court judgment datasets, filtered to property disputes in stages (metadata, full text, semantic check), with incremental weekly updates.</aside>
+</section>
+
+<!-- ===================================================== 20. CHAT -->
+<section class="slide" data-chapter="Act 4 · Chat">
+  <div class="kicker r">Step 7 · Asking</div>
+  <h2 class="r" style="--d:.1s">She asks in Hinglish. It answers with sources.</h2>
+  <div class="row" style="gap:70px; align-items:center">
+    <div class="phonechat r pop" style="--d:.2s" id="chat">
+      <div class="bub me" id="b1"><span class="mention">@receipt.pdf</span> isme kitna amount likha hai? Agreement se match karta hai?</div>
+      <div class="bub bot" id="b2"><span id="b2t"></span>
+        <div class="sources" id="b2s">Sources · 📄 receipt.pdf · p.1 · 📄 agreement.pdf · p.1</div></div>
+      <div class="bub me" id="b3">Seller ko darane ke liye kuch log bhej doon?</div>
+      <div class="bub bot" id="b4">Main is mein madad nahi kar sakta, kyunki yeh gair-kaanooni hai. Aap legal notice bhej sakti hain ya civil suit kar sakti hain. Muft kanooni sahayata: NALSA <b>15100</b>. Khatra ho to <b>112</b>.</div>
+    </div>
+    <div class="col grow">
+      <div class="card r" style="--d:.5s"><h3>@ mentions</h3><p>Type @ to pick a document; the answer focuses on it and cites its pages.</p></div>
+      <div class="card r" style="--d:.7s"><h3>Sources under every reply</h3><p>Only verified pages and judgments, or "general information: verify with an advocate".</p></div>
+      <div class="card r" style="--d:.9s"><h3>Knows the whole case</h3><p>Fact sheet, documents and judgments are refreshed on every turn; answers stream live.</p></div>
+    </div>
+  </div>
+  <aside class="notes">The assistant is tool-using: it can search judgments, read judgment paragraphs and read the user's documents. Citations are machine-checkable markers, verified before they're shown. Note the second exchange: an illegal request is refused politely, with a lawful route and helplines.</aside>
+</section>
+
+<!-- ===================================================== 21. BRIEF -->
+<section class="slide" data-chapter="Act 4 · Brief">
+  <div class="kicker r">Step 8 · Preparing</div>
+  <h2 class="r" style="--d:.1s">The brief she takes to her advocate.</h2>
+  <div class="row" style="gap:44px">
+    <div class="brief grow" id="briefStack">
+      <div class="b-user r left" style="--d:.2s">1 · Her summary, in her words</div>
+      <div class="b-doc r left" style="--d:.3s">2 · Documents processed (and any that couldn't be read)</div>
+      <div class="b-doc r left" style="--d:.4s">3 · Chronology, each event linked to a page</div>
+      <div class="b-doc r left" style="--d:.5s">4 · Facts supported by her documents (verified quotes only)</div>
+      <div class="b-user r left" style="--d:.6s">5 · Her account not supported by documents</div>
+      <div class="b-gap r left" style="--d:.7s">6 · Gaps, inconsistencies, user-vs-document conflicts</div>
+      <div class="b-law r left" style="--d:.8s">7 · Potentially relevant judgments and why</div>
+      <div class="b-ai r left" style="--d:.9s">8 · Questions to discuss with an advocate (AI-suggested, labelled)</div>
+      <div class="b-ai r left" style="--d:1s">9 · Preparation checklist</div>
+    </div>
+    <div class="col" style="width:440px">
+      <div class="shot phone r" style="--d:.4s; width:250px; align-self:center" data-src="demo/10-brief" data-label="The brief on the phone"></div>
+      <p class="small r" style="--d:1.1s; text-align:center">Draft for review. Nothing is filed, signed or sent.</p>
+    </div>
+  </div>
+  <aside class="notes">The design point: separation. Document facts, her claims, AI suggestions and legal sources are visually and structurally separate, so neither she nor the advocate confuses them.</aside>
+</section>
+
+<!-- ===================================================== 22. SAFETY -->
+<section class="slide" data-chapter="Act 4 · Safety">
+  <div class="kicker r">Responsible AI</div>
+  <h2 class="r" style="--d:.1s">Helpful, but never harmful.</h2>
+  <div class="row" style="gap:60px; align-items:center">
+    <svg class="shield r pop" viewBox="0 0 230 260" style="--d:.2s"><path d="M115 10 L210 45 V125 C210 190 165 235 115 250 C65 235 20 190 20 125 V45 Z"/><text x="115" y="150" text-anchor="middle" font-size="70">🛡️</text></svg>
+    <div class="grid3 grow">
+      <div class="card r" style="--d:.3s"><h3 class="t-red">Refuses</h3><p>Forging or back-dating documents, stamp-duty evasion, benami deals, bribery, threats, illegal eviction, digging up someone's personal details. Offers the lawful route instead.</p></div>
+      <div class="card r" style="--d:.5s"><h3 class="t-saffron">Protects</h3><p>If someone may be in danger: <span class="help"><b>112</b> police</span> <span class="help"><b>181</b> women</span> <span class="help"><b>14416</b> Tele-MANAS</span> <span class="help"><b>15100</b> NALSA</span></p></div>
+      <div class="card r" style="--d:.7s"><h3 class="t-teal">Stays fair</h3><p>No stereotyping by caste, religion, gender or community. Neutral words ("did not refund", not "fraudster"). No guaranteed outcomes.</p></div>
+    </div>
+  </div>
+  <p class="small r" style="--d:1s; margin-top:24px">Red-team suite: 17 cases (10 must-refuse, 2 people at risk, 2 bias/jailbreak, 3 legitimate questions that must <b>not</b> be refused), so we also catch an over-cautious assistant.</p>
+  <aside class="notes">Mention the controls: a model that refuses everything would score perfectly on "refusal" but be useless, so legitimate questions are part of the test. The rules apply to every prompt that talks to users, plus a safe fallback if the provider blocks a reply.</aside>
+</section>
+
+<!-- ===================================================== 23. FRESH -->
+<section class="slide" data-chapter="Act 4 · Keeping current">
+  <div class="kicker r">The law keeps moving</div>
+  <h2 class="r" style="--d:.1s">A legal memory that keeps itself up to date.</h2>
+  <div class="tl">
+    <div class="pt" style="left:3%;--d:.3s">✓</div><div class="lab" style="left:3%">initial load</div>
+    <div class="pt" style="left:22%;--d:.5s">✓</div><div class="lab" style="left:22%">week 1</div>
+    <div class="pt" style="left:41%;--d:.7s">✓</div><div class="lab" style="left:41%">week 2</div>
+    <div class="pt new" style="left:60%;--d:.9s">+</div><div class="lab" style="left:60%">new judgments published</div>
+    <div class="pt new" style="left:79%;--d:1.1s">+</div><div class="lab" style="left:79%">auto-detected & filtered</div>
+    <div class="pt" style="left:96%;--d:1.3s">⚖️</div><div class="lab" style="left:93%">searchable</div>
+  </div>
+  <div class="grid3" style="margin-top:20px">
+    <div class="card r" style="--d:.5s"><h3>Detect</h3><p>Court datasets publish new judgments as timestamped batches; a weekly job notices only what changed.</p></div>
+    <div class="card r" style="--d:.7s"><h3>Filter</h3><p>Only property and land disputes pass: case type, acts cited, headnotes, full text, then a semantic check.</p></div>
+    <div class="card r" style="--d:.9s"><h3>Learn</h3><p>New judgments become searchable; summaries are written only when first needed, keeping costs near zero.</p></div>
+  </div>
+  <aside class="notes">Implemented: one command (python -m ingest) detects changed dataset partitions by ETag, filters in four stages and stores only property judgments, with no LLM call at ingestion. Dry runs on live data: SC 2024, 154 of 782 kept; Bombay HC at Goa 2025, 16 of 1,466. Real-data checks found that SC metadata has no headnote before 2024, so those judgments are judged on full text. Filter precision still has to be hand-labelled.</aside>
+</section>
+
+<!-- ===================================================== 24. CHAPTER: PROOF -->
+<section class="slide chapter-slide" data-chapter="Act 5 · Proof">
+  <div class="kicker r">Act 5</div>
+  <h1 class="r" style="--d:.15s">Does it actually work?</h1>
+  <p class="lead r" style="--d:.35s; margin-top:20px">First, see it. Then, measure it.</p>
+  <div class="big">05</div>
+  <aside class="notes">Switch to the live demo, or play the recorded GIFs on the next slide if the network is unreliable.</aside>
+</section>
+
+<!-- ===================================================== 25. DEMO -->
+<section class="slide" data-chapter="Act 5 · Demo">
+  <div class="kicker r">Live demo</div>
+  <h2 class="r" style="--d:.1s">Meera's case, end to end.</h2>
+  <div class="grid4 demo-row" style="gap:26px">
+    <div class="r" style="--d:.2s"><div class="shot phone" data-src="demo/03-upload" data-label="Attach a receipt photo"></div><div class="caption">Attach a photo</div></div>
+    <div class="r" style="--d:.35s"><div class="shot phone" data-src="demo/05-language" data-label="Explained · English / हिन्दी / Hinglish"></div><div class="caption">Understand it</div></div>
+    <div class="r" style="--d:.5s"><div class="shot phone" data-src="demo/07-case-summary" data-label="Case summary with sources"></div><div class="caption">See the conflicts</div></div>
+    <div class="r" style="--d:.65s"><div class="shot phone" data-src="demo/09-chat-mention" data-label="Chat with @receipt.pdf"></div><div class="caption">Ask, with sources</div></div>
+  </div>
+  <aside class="notes">Demo script: 1) new case, documents only; 2) attach the agreement, receipt (photo) and notice; 3) open the receipt: Explained, switch to Hinglish; 4) Timeline & flags: point out 123/4 vs 123/A; 5) chat: "@receipt.pdf isme kitna amount likha hai?", show Sources; 6) ask something illegal and show the refusal; 7) generate the brief. Fallback: the GIFs on this slide and the next.</aside>
+</section>
+
+<!-- ===================================================== 26. MORE DEMO -->
+<section class="slide" data-chapter="Act 5 · Demo">
+  <div class="kicker r">More screens</div>
+  <div class="row" style="gap:30px; flex:1; align-items:center">
+    <div class="grow r" style="--d:.15s"><div class="shot wide" data-src="demo/12-full-demo" data-label="Full journey recording (optional)"></div></div>
+    <div class="col" style="width:520px">
+      <div class="row r" style="--d:.3s"><div class="shot phone" style="width:240px" data-src="demo/06-timeline" data-label="Timeline & flags"></div><div class="shot phone" style="width:240px" data-src="demo/08-similar-cases" data-label="Similar judgments"></div></div>
+      <div class="row r" style="--d:.45s"><div class="shot phone" style="width:240px" data-src="demo/11-safety" data-label="Safe refusal"></div><div class="shot phone" style="width:240px" data-src="demo/01-home" data-label="All my documents"></div></div>
+    </div>
+  </div>
+  <aside class="notes">Use this slide as backup or to show screens not covered live.</aside>
+</section>
+
+<!-- ===================================================== 27. METHOD -->
+<section class="slide" data-chapter="Act 5 · Evaluation">
+  <div class="kicker r">How we measured</div>
+  <h2 class="r" style="--d:.1s">Not "it worked in the demo". <span class="grad">Measured.</span></h2>
+  <div class="row" style="gap:50px; margin-top:10px">
+    <div class="stat r" style="--d:.3s"><div class="num grad"><span class="count" data-to="200">0</span></div><div class="lbl">synthetic property-dispute cases with known answers</div></div>
+    <div class="stat r" style="--d:.5s"><div class="num grad"><span class="count" data-to="517">0</span></div><div class="lbl">documents in English and Hindi</div></div>
+    <div class="stat r" style="--d:.7s"><div class="num grad"><span class="count" data-to="3">0</span></div><div class="lbl">scan qualities: clean, phone photo, degraded</div></div>
+  </div>
+  <div class="grid3" style="margin-top:40px">
+    <div class="card r" style="--d:.9s"><h3>Traps planted</h3><p>Different survey numbers and amounts across documents; distractors like cheque numbers and "Section 54" that must <b>not</b> be extracted.</p></div>
+    <div class="card r" style="--d:1.05s"><h3>Formats varied</h3><p>Rs. 5,00,000/- · Rs 5 lakh · INR 500000 · <span class="deva">रुपये ५,००,०००</span> · 15th March, 2023 · <span class="deva">१५/०३/२०२३</span></p></div>
+    <div class="card r" style="--d:1.2s"><h3>Honest statistics</h3><p>Precision, recall and F1 with 95% confidence intervals. Small samples are reported as ranges, not as "100%".</p></div>
+  </div>
+  <aside class="notes">Because we generate the cases, every expected value is known exactly, so the evaluation is automatic and repeatable with a fixed seed. Be upfront: synthetic data is an optimistic setting; real documents come next.</aside>
+</section>
+
+<!-- ===================================================== 28. RESULTS -->
+<section class="slide" data-chapter="Act 5 · Evaluation">
+  <div class="kicker r">Results</div>
+  <h2 class="r" style="--d:.1s">What the numbers say.</h2>
+  <div class="res r" style="--d:.2s">
+    <div class="k">Key values from typed documents</div><div class="bar"><i style="background:var(--green)" data-w="100%"></i><b>100% F1</b></div>
+    <div class="k">After OCR, clean scans</div><div class="bar"><i style="background:var(--teal)" data-w="98.3%"></i><b>98.3% F1</b></div>
+    <div class="k">After OCR, phone-photo scans</div><div class="bar"><i style="background:var(--teal)" data-w="96.1%"></i><b>96.1% F1</b></div>
+    <div class="k">After OCR, degraded scans</div><div class="bar"><i style="background:var(--red)" data-w="43.7%"></i><b>43.7% F1</b></div>
+    <div class="k">Legal terms spotted</div><div class="bar"><i style="background:var(--green)" data-w="100%"></i><b>100% (2,185)</b></div>
+    <div class="k">Document type & language</div><div class="bar"><i style="background:var(--green)" data-w="100%"></i><b>517 / 517</b></div>
+    <div class="k">Planted conflicts flagged</div><div class="bar"><i style="background:var(--saffron)" data-w="100%"></i><b>163 / 163 · 0 false alarms</b></div>
+    <div class="k">Bad source references rejected</div><div class="bar"><i style="background:var(--violet)" data-w="100%"></i><b>800 / 800</b></div>
+  </div>
+  <p class="small r" style="--d:1s; margin-top:18px">Degraded scans remain hard (shown in red), which is why every OCR'd value is labelled "check against the original". The AI-written parts (explanations, chat answers) are measured next with the same framework.</p>
+  <aside class="notes">Read the red bar out loud. Showing a weakness honestly is more convincing than a wall of 100s. Mention the confidence intervals: e.g. OCR clean recall is 95.7–98.6%.</aside>
+</section>
+
+<!-- ===================================================== 29. BUGS -->
+<section class="slide" data-chapter="Act 5 · Evaluation">
+  <div class="kicker r">Evaluation changed the product</div>
+  <h2 class="r" style="--d:.1s">Four problems no demo would have shown.</h2>
+  <div class="grid2">
+    <div class="card r" style="--d:.3s"><h3><span class="deva">रुपये 5 लाख</span> read as ₹5</h3><p>The Hindi word for lakh wasn't understood, causing false "amount conflict" alarms (precision 96%). Fixed → 100%.</p></div>
+    <div class="card r" style="--d:.5s"><h3>Survey no. <span class="deva">१२३/४</span> vanished</h3><p>Devanagari identifiers were erased during comparison, so real differences went unnoticed. Fixed and tested.</p></div>
+    <div class="card r" style="--d:.7s"><h3>"5,50,000" became "5.50,000"</h3><p>OCR read a comma as a dot, turning ₹5.5 lakh into ₹5.5. The parser now understands this OCR slip.</p></div>
+    <div class="card r" style="--d:.9s"><h3>242 of 245 judgments skipped</h3><p>The court dataset's language field was empty for new 2026 judgments. Our ingester now checks the actual file, not the flag.</p></div>
+  </div>
+  <aside class="notes">This slide shows engineering maturity: measurement finds real problems. All four are fixed, each with a regression test.</aside>
+</section>
+
+<!-- ===================================================== 30. LIMITS -->
+<section class="slide" data-chapter="Act 6 · Honesty">
+  <div class="kicker r">What we don't claim</div>
+  <h2 class="r" style="--d:.1s">Limits, stated plainly.</h2>
+  <div class="grid2">
+    <div class="card r" style="--d:.2s"><h3>Synthetic test data</h3><p>Template documents and simulated scans. Next: 10–20 real, permissioned documents labelled by two people.</p></div>
+    <div class="card r" style="--d:.35s"><h3>Poor scans stay hard</h3><p>43.7% F1 on degraded scans; handwriting isn't supported. We flag rather than guess.</p></div>
+    <div class="card r" style="--d:.5s"><h3>AI quality: measured next</h3><p>The harnesses for explanations, chat and safety are ready; they need a sustained run on the model.</p></div>
+    <div class="card r" style="--d:.65s"><h3>Not legal advice</h3><p>It prepares; it never decides ownership, predicts outcomes or replaces an advocate.</p></div>
+  </div>
+  <aside class="notes">Examiners value this. Say it confidently, not apologetically.</aside>
+</section>
+
+<!-- ===================================================== 31. NEXT -->
+<section class="slide" data-chapter="Act 6 · What's next">
+  <div class="kicker r">What's next</div>
+  <h2 class="r" style="--d:.1s">From prototype to public good.</h2>
+  <div class="grid3">
+    <div class="card r" style="--d:.2s"><h3>⚖️ Full legal memory</h3><p>All Supreme Court and High Court property judgments, updated weekly; statutes alongside.</p></div>
+    <div class="card r" style="--d:.35s"><h3>🗣️ Hindi-first search</h3><p>Multilingual embeddings, measured on Hindi and Hinglish questions before switching.</p></div>
+    <div class="card r" style="--d:.5s"><h3>🧾 Real-document trials</h3><p>With legal-aid clinics: permissioned documents, advocate review of outputs.</p></div>
+    <div class="card r" style="--d:.65s"><h3>🔗 Precedent status</h3><p>Citation graph: warn when a judgment was later reversed or overruled.</p></div>
+    <div class="card r" style="--d:.8s"><h3>📷 Better scans</h3><p>Deskewing and smarter clean-up for degraded photos; a camera mode in the app.</p></div>
+    <div class="card r" style="--d:.95s"><h3>🎯 Fine-tuning, only if needed</h3><p>Only when evaluation shows a repeated failure that prompts and rules can't fix.</p></div>
+  </div>
+  <aside class="notes">Close the technical arc. Fine-tuning is deliberately last: evidence first.</aside>
+</section>
+
+<!-- ===================================================== 32. CLOSING -->
+<section class="slide center" data-chapter="Thank you">
+  <div class="kicker r">Back to Meera</div>
+  <p class="lead r" style="--d:.2s; max-width:1250px; font-size:36px">A month later, Meera walks into a legal-aid office. She doesn't bring a pile of papers.</p>
+  <p class="lead r" style="--d:1s; max-width:1250px; font-size:36px; margin-top:24px">She brings a <span class="grad">nine-section brief</span>, a timeline, two conflicts flagged, three relevant judgments, and every line traceable to a page.</p>
+  <h1 class="r pop" style="--d:2s; margin-top:60px; font-size:96px">Thank you.</h1>
+  <p class="lead r" style="--d:2.4s; margin-top:14px">Questions?</p>
+  <p class="small r" style="--d:2.6s; margin-top:40px">NyayaSathi AI · legal document analysis using NLP · a preparation aid, not legal advice</p>
+  <aside class="notes">End on the story. Then open for questions. Likely questions: How do you prevent hallucinations? (verification layers). Why not just ChatGPT? (verification, Indian corpus, separation of facts and claims). Why Tesseract? (benchmark). Why hybrid search? How valid is a synthetic evaluation? (fixed regression set with planted traps; real documents next).</aside>
+</section>
+
+</div></div>
+
+<script>
+(() => {
+  const slides = [...document.querySelectorAll(".slide")];
+  const stage = document.getElementById("stage");
+  const progress = document.getElementById("progress");
+  const chapter = document.getElementById("chapter");
+  const counter = document.getElementById("counter");
+  const notes = document.getElementById("notes");
+  const notesBody = document.getElementById("notesBody");
+  let current = 0, timers = [];
+
+  // ---- Fit the 1600×900 stage to the window ----
+  function fit() {
+    const s = Math.min(innerWidth / 1600, innerHeight / 900);
+    stage.style.transform = `scale(${s})`;
+  }
+  addEventListener("resize", fit); fit();
+
+  // ---- Title letters ----
+  const tw = document.getElementById("titleWord");
+  tw.innerHTML = [...tw.textContent].map((c, i) => `<span style="animation-delay:${0.5 + i * 0.06}s">${c === " " ? "&nbsp;" : c}</span>`).join("");
+
+  // ---- Demo screens: load presentation/demo/<name>.(gif|png|jpg|webp) or show a placeholder ----
+  document.querySelectorAll(".shot").forEach(el => {
+    const base = el.dataset.src, label = el.dataset.label || base;
+    el.innerHTML = `<div class="ph"><span class="cam">🎬</span>${label}<br><code>${base}.gif</code></div>`;
+    const exts = ["gif", "png", "jpg", "webp"];
+    (function tryNext(i) {
+      if (i >= exts.length) return;
+      const img = new Image();
+      img.onload = () => { el.innerHTML = ""; el.appendChild(img); el.classList.add("loaded"); };
+      img.onerror = () => tryNext(i + 1);
+      img.alt = label;
+      img.src = `${base}.${exts[i]}`;
+    })(0);
+  });
+
+  // ---- Slide-specific animations, run each time a slide becomes active ----
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  function typeInto(el, text, speed = 22, done) {
+    el.textContent = ""; el.classList.add("typing"); let i = 0;
+    (function step() {
+      if (i <= text.length) { el.textContent = text.slice(0, i++); later(step, speed); }
+      else { el.classList.remove("typing"); done && done(); }
+    })();
+  }
+  const anims = {
+    counters(slide) {
+      slide.querySelectorAll(".count").forEach(el => {
+        const to = +el.dataset.to, suf = el.dataset.suffix || "", t0 = performance.now(), dur = 1600;
+        (function tick(t) {
+          const p = Math.min(1, (t - t0) / dur), v = Math.round(to * (1 - Math.pow(1 - p, 3)));
+          el.textContent = v.toLocaleString("en-IN") + suf;
+          if (p < 1 && slide.classList.contains("active")) requestAnimationFrame(tick);
+        })(t0);
+      });
+    },
+    bars(slide) {
+      slide.querySelectorAll(".bar i").forEach(i => { i.style.width = "0"; });
+      later(() => slide.querySelectorAll(".bar i").forEach(i => { i.style.width = i.dataset.w; }), 500);
+    },
+    ocr() {
+      const out = document.getElementById("ocrOut");
+      later(() => typeInto(out, "RECEIPT\nDate: 15/03/2023\nReceived from Meera Iyer a sum of\nRs. 5,50,000/- by cheque no. 004512\n…Survey No. 123/A, Village Wadgaon\n\n→ page 1 · read by OCR · confidence 93%", 18), 900);
+    },
+    nlp(slide) {
+      const hls = [...slide.querySelectorAll(".hl")];
+      hls.forEach(h => h.classList.remove("on"));
+      hls.forEach((h, i) => later(() => h.classList.add("on"), 500 + i * 280));
+    },
+    verify() {
+      const items = [...document.querySelectorAll("#verifyList .claim")];
+      items.forEach(c => c.className = "claim");
+      items.forEach((c, i) => {
+        later(() => c.classList.add(c.dataset.state === "ok" ? "ok" : "drop"), 700 + i * 650);
+        if (c.dataset.state !== "ok") later(() => c.classList.add("gone"), 1500 + i * 650);
+      });
+    },
+    conflict() {
+      ["c1", "c2", "c3", "c4"].forEach(id => document.getElementById(id).classList.remove("on"));
+      ["f1", "f2", "f3"].forEach(id => document.getElementById(id).classList.remove("on"));
+      later(() => { document.getElementById("c1").classList.add("on"); document.getElementById("c4").classList.add("on"); }, 900);
+      later(() => document.getElementById("f1").classList.add("on"), 1500);
+      later(() => { document.getElementById("c2").classList.add("on"); document.getElementById("c3").classList.add("on"); }, 2300);
+      later(() => document.getElementById("f2").classList.add("on"), 2900);
+      later(() => document.getElementById("f3").classList.add("on"), 3700);
+    },
+    explain() {
+      const texts = [
+        ["English", "This receipt says Ravi Kulkarni received Rs. 5,50,000/- from Meera Iyer as an advance (earnest money: a part payment to show the buyer is serious) for plot Survey No. 123/A."],
+        ["हिन्दी", "इस रसीद के अनुसार रवि कुलकर्णी ने मीरा अय्यर से सर्वे नंबर 123/A के प्लॉट के लिए Rs. 5,50,000/- अग्रिम राशि (बयाना) के रूप में प्राप्त किए।"],
+        ["Hinglish", "Is receipt ke hisaab se Ravi Kulkarni ne Meera Iyer se plot Survey No. 123/A ke liye Rs. 5,50,000/- advance (earnest money, yaani bayana) liya."],
+      ];
+      const el = document.getElementById("explainText"), chips = [...document.querySelectorAll("#langs span")];
+      let k = 0;
+      function show() {
+        const idx = k; // the chip, the font and the text must use the same language
+        chips.forEach((c, i) => c.classList.toggle("on", i === idx));
+        el.classList.toggle("deva", idx === 1);
+        el.style.opacity = 0;
+        later(() => { el.style.opacity = 1; typeInto(el, texts[idx][1], 16); }, 300);
+        k = (idx + 1) % texts.length;
+        later(show, 6200);
+      }
+      later(show, 400);
+    },
+    search(slide) {
+      const fz = [...slide.querySelectorAll("#fz .it")], kw = [...slide.querySelectorAll("#kw .it")], sm = [...slide.querySelectorAll("#sm .it")];
+      [...fz, ...kw, ...sm].forEach(e => { e.style.opacity = 0; e.style.transform = "translateY(10px)"; });
+      kw.forEach((e, i) => later(() => { e.style.opacity = 1; e.style.transform = "none"; }, 500 + i * 250));
+      sm.forEach((e, i) => later(() => { e.style.opacity = 1; e.style.transform = "none"; }, 700 + i * 250));
+      fz.forEach((e, i) => later(() => { e.style.opacity = 1; e.style.transform = "none"; }, 1800 + i * 350));
+      const f = [...slide.querySelectorAll("#funnel div")];
+      f.forEach(d => d.classList.remove("on"));
+      f.forEach((d, i) => later(() => d.classList.add("on"), 2600 + i * 450));
+    },
+    chat() {
+      ["b1", "b2", "b3", "b4"].forEach(id => document.getElementById(id).classList.remove("on"));
+      document.getElementById("b2s").classList.remove("on");
+      document.getElementById("b2t").textContent = "";
+      later(() => document.getElementById("b1").classList.add("on"), 600);
+      later(() => {
+        document.getElementById("b2").classList.add("on");
+        typeInto(document.getElementById("b2t"), "Receipt mein Rs. 5,50,000/- likha hai (receipt p.1). Agreement mein advance Rs. 5,00,000/- hai (agreement p.1). Dono match nahi karte, yeh baat apne advocate se zaroor discuss karein.", 18,
+          () => document.getElementById("b2s").classList.add("on"));
+      }, 1500);
+      later(() => document.getElementById("b3").classList.add("on"), 6800);
+      later(() => document.getElementById("b4").classList.add("on"), 8200);
+    },
+  };
+  const slideAnims = {
+    3: ["counters"], 12: ["ocr", "bars"], 13: ["nlp"], 14: ["verify"], 15: ["conflict"], 17: ["explain"],
+    18: ["search"], 19: ["chat"], 26: ["counters"], 27: ["bars"],
+  };
+
+  // ---- Navigation ----
+  function go(n) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    timers.forEach(clearTimeout); timers = [];
+    slides.forEach((s, i) => { s.classList.toggle("active", i === n); s.classList.toggle("past", i < n); });
+    // Restart CSS animations on the new slide
+    const s = slides[n];
+    s.querySelectorAll(".r, .paper, .qmark, .pt").forEach(e => { e.style.animation = "none"; e.offsetHeight; e.style.animation = ""; });
+    current = n;
+    progress.style.width = `${((n + 1) / slides.length) * 100}%`;
+    chapter.textContent = s.dataset.chapter || "";
+    counter.textContent = `${n + 1} / ${slides.length}`;
+    const note = s.querySelector("aside.notes");
+    notesBody.innerHTML = note ? note.innerHTML : "<em>No notes.</em>";
+    (slideAnims[n] || []).forEach(a => anims[a](s));
+    try { history.replaceState(null, "", `#${n + 1}`); } catch (e) {}
+  }
+  addEventListener("keydown", e => {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); go(current + 1); }
+    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); go(current - 1); }
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(slides.length - 1);
+    else if (e.key.toLowerCase() === "n") notes.classList.toggle("open");
+    else if (e.key.toLowerCase() === "f") { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
+    else if (e.key.toLowerCase() === "g") { const k = parseInt(prompt("Go to slide:", current + 1), 10); if (k) go(k - 1); }
+    else if (e.key === "Escape") notes.classList.remove("open");
+  });
+  addEventListener("click", e => { if (e.target.closest("#notes")) return; (e.clientX > innerWidth * 0.25 ? go(current + 1) : go(current - 1)); });
+  let tx = null;
+  addEventListener("touchstart", e => { tx = e.touches[0].clientX; }, { passive: true });
+  addEventListener("touchend", e => { if (tx === null) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 50) go(current + (dx < 0 ? 1 : -1)); tx = null; });
+  setTimeout(() => document.getElementById("hint").style.opacity = 0, 6000);
+
+  // ---- Ambient particles ("connections between documents") ----
+  const cv = document.getElementById("bgcanvas"), ctx = cv.getContext("2d");
+  let W, H, pts;
+  function resize() { W = cv.width = innerWidth * devicePixelRatio; H = cv.height = innerHeight * devicePixelRatio; pts = Array.from({ length: 55 }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25 })); }
+  addEventListener("resize", resize); resize();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  (function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const d = 150 * devicePixelRatio;
+    for (const p of pts) { p.x = (p.x + p.vx + W) % W; p.y = (p.y + p.vy + H) % H; }
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const a = pts[i], b = pts[j], dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist < d) { ctx.strokeStyle = `rgba(110,168,255,${0.10 * (1 - dist / d)})`; ctx.lineWidth = devicePixelRatio; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    }
+    for (const p of pts) { ctx.fillStyle = "rgba(255,179,71,.35)"; ctx.beginPath(); ctx.arc(p.x, p.y, 1.6 * devicePixelRatio, 0, 7); ctx.fill(); }
+    if (!reduce) requestAnimationFrame(draw);
+  })();
+
+  const start = parseInt((location.hash || "#1").slice(1), 10) - 1;
+  go(isNaN(start) ? 0 : start);
+})();
+</script>
+</body>
+</html>

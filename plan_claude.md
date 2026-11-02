@@ -354,20 +354,65 @@ project/
 
 ## 11. Definition of done for the initial build
 
-- [ ] Existing repository audited and working behavior preserved.
-- [ ] Android app builds/runs, or blockers are documented.
-- [ ] Supported PDF upload and page-level extraction work.
-- [ ] Structured facts are validated and reviewable.
-- [ ] Timeline/gap flags link to source records.
-- [ ] A small legal corpus is searchable.
-- [ ] RAG answers show real, resolvable sources.
-- [ ] The brief separates supported facts, allegations, uncertainty, and legal sources.
-- [ ] Important failure paths are tested.
-- [ ] Baseline evaluation and limitations are documented.
-- [ ] README has setup/run/test instructions.
-- [ ] No secrets are committed or embedded in the app.
-- [ ] No unsupported claims are made about legal outcomes or replacing an advocate.
-- [ ] Fine-tuning has not started during the initial build.
+- [x] Existing repository audited and working behavior preserved.
+- [ ] Android app builds/runs, or blockers are documented. *(Blocker documented: no Android SDK in the dev environment; new screens not yet compiled.)*
+- [x] Supported PDF upload and page-level extraction work.
+- [x] Structured facts are validated and reviewable.
+- [x] Timeline/gap flags link to source records.
+- [x] A small legal corpus is searchable. *(Existing Supreme Court judgment hybrid search.)*
+- [x] RAG answers show real, resolvable sources. *(Judgment and document-page citations are both checked.)*
+- [x] The brief separates supported facts, allegations, uncertainty, and legal sources.
+- [x] Important failure paths are tested.
+- [ ] Baseline evaluation and limitations are documented. *(Harness and docs done; LLM run pending an API key.)*
+- [x] README has setup/run/test instructions.
+- [x] No secrets are committed or embedded in the app.
+- [x] No unsupported claims are made about legal outcomes or replacing an advocate.
+- [x] Fine-tuning has not started during the initial build.
+
+## 11a. Progress log
+
+- **M1 Audit**: done. Stack: Kotlin/Compose + FastAPI + Postgres/pgvector, LLM via an OpenAI-compatible API.
+- **M2 PDF to facts**: done. `app/services/documents.py`, `DocumentFacts` in `app/llm/schemas.py`,
+  `CaseDocument` table, routes in `app/api/documents.py`.
+- **M3 Evidence pack**: done. `app/services/evidence.py` (deterministic, no LLM).
+- **M4 Legal RAG / QA**: reused the existing judgment search and advisor. Added the
+  `read_case_documents` tool and the `[[D:id:pN]]` citation check.
+- **F6 Brief**: done. `app/services/brief.py`, `POST /cases/{id}/brief`.
+- **M5 Android**: code written (My documents, document review, brief screens, chat document
+  citations), but **not compiled**: no Android SDK on the dev machine. Next step: `./gradlew assembleDebug`.
+- **M6 Tests/eval**: 31 backend tests pass. `eval/run_eval.py` and `docs/evaluation.md` added. The
+  deterministic eval passes; the LLM eval (`--llm`) still needs an API key.
+- **Safety guardrails**: `SAFETY_RULES` added to all user-facing prompts, plus a safe fallback for
+  blocked chat replies; red-team set `eval/safety_cases.py` (17 cases) with runner
+  `eval/run_safety_eval.py`; `tests/test_safety.py`. 38 tests pass. The red-team run needs an API key.
+- **Case workspace + chat context**: opening a case now goes to a case home screen (`ui/cases/CaseScreen.kt`)
+  with "Chat about this case" as the main action. The chat's case context (fact sheet, documents, search
+  results) is rebuilt on every turn instead of being stored once, so chat stays current. 39 tests pass.
+- **Speed + first-run UX**: fast/main model tiers, low reasoning effort, fewer retries, schema-fallback
+  memo, background fact extraction with polling, smaller search prompt, at most 3 chat tool rounds,
+  per-call timing logs. Android: attach PDFs on the first intake step, case home after search,
+  feature intro on the empty case list. 42 tests pass.
+- **OCR** (`ocr_plan.md`, `docs/ocr_steps.md`): scanned PDFs and JPG/PNG photos are read by
+  Tesseract (default) or PaddleOCR (optional extra), behind one engine interface. OCR runs in the
+  background; per-page source/engine/confidence is stored in `page_info`; `ocr_used`,
+  `ocr_low_confidence` and `ocr_page_not_read` flags; `from_ocr` on every source. Engine benchmark
+  in `eval/run_ocr_eval.py` (English + Hindi). Decision: **Tesseract** (`docs/ocr_report.md`),
+  plus an adaptive denoise retry for low-confidence pages.
+- **Documents as source of truth** (`docs/case_facts.md`): the fact sheet is built from the user's
+  text (optional) + document facts, with per-item sources checked in code, user-vs-document
+  conflicts, rule-based NLP cross-check (`app/services/nlp.py`, English/Hindi), automatic
+  rebuild after each processed document, and documents-only cases. 75 tests pass.
+- **Scope (2026-10-31)**: documents English/Hindi only; chat English/Hindi/Hinglish; Marathi removed.
+- **Document understanding** (`doc_plan.md`): glossary term spotting, language ID (en/hi/Hinglish),
+  rule-based classifier, plain-language explanations checked in code (pages, quotes, values, advice),
+  cached per language; All my documents; chat `@` mentions and per-reply Sources. Scorecard
+  (`eval/run_all.py`, 200 synthetic cases) and `docs/eval_report.md`. 102 tests pass.
+- **Mobile rendering of LLM text**: `ui/markdown/` renders chat replies as phone-friendly Markdown (hanging-indent bullets, headings, tables as one card per row, citation links kept inside bold/lists/cells); every hand-made "• " bullet in the app now uses `Bullet`/`BulletText`; page chips and language chips wrap (`FlowRow`). Prompts: `CHAT_FORMAT_RULES` (no tables, short paragraphs) on chat, `PLAIN_FIELD_RULES` on search analysis, document understanding and brief suggestions. Parser checked with a standalone kotlinc (19/20, the miss fixed afterwards); `MarkdownParserTest` added (JUnit). 107 backend tests pass. Compose UI not compiled yet.
+- **Judgment ingestion** (`ingest_plan.md` §13): `python -m ingest`: SC + HC property/land judgments,
+  4-stage filter, incremental (ETag watermarks), idempotent, lazy summaries, corpus stats, scheduling
+  templates, filter evaluation tool. Dry runs on live data: SC 2024 154/782, HC Goa 2025 16/1,466.
+- **Remaining**: compile and test the Android build;  run `eval.run_safety_eval` and record the results; run `eval.run_eval --llm` and record the results
+  plus representative errors in `docs/evaluation.md`; add a retrieval eval with fixed questions.
 
 ## 12. First action
 

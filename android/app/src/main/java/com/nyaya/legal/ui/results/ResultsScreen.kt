@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import com.nyaya.legal.ui.theme.MixedColor
 import com.nyaya.legal.ui.theme.OpposesColor
 import com.nyaya.legal.ui.theme.SupportsColor
 import kotlinx.coroutines.launch
+import com.nyaya.legal.ui.markdown.MarkdownText
 
 class ResultsViewModel(caseId: String) : ViewModel() {
     var results by mutableStateOf<List<CaseResult>?>(null)
@@ -54,20 +56,27 @@ class ResultsViewModel(caseId: String) : ViewModel() {
         viewModelScope.launch {
             runCatching { Api.service.results(caseId) }
                 .onSuccess { results = it }
-                .onFailure { error = "Could not load results: ${it.message}" }
+                .onFailure { error = Api.errorMessage(it) }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ResultsScreen(caseId: String, onBack: () -> Unit, onOpenJudgment: (String) -> Unit, onChat: () -> Unit) {
+fun ResultsScreen(
+    caseId: String,
+    onBack: () -> Unit,
+    onOpenJudgment: (String) -> Unit,
+    onChat: () -> Unit,
+    onDocuments: () -> Unit,
+) {
     val vm: ResultsViewModel = viewModel { ResultsViewModel(caseId) }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Similar cases") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                actions = { TextButton(onClick = onDocuments) { Text("My documents") } },
             )
         },
         floatingActionButton = {
@@ -84,12 +93,17 @@ fun ResultsScreen(caseId: String, onBack: () -> Unit, onOpenJudgment: (String) -
             when {
                 vm.error != null -> ErrorText(vm.error!!)
                 results == null -> Loading("Loading…")
-                results.isEmpty() -> Text("No closely matching judgments were found in the database yet.", Modifier.padding(16.dp))
+                results.isEmpty() -> Text(
+                    "No closely matching judgments were found among the judgments loaded so far. You can still " +
+                        "chat about your case, attach documents and prepare a brief; more judgments may help later.",
+                    Modifier.padding(16.dp),
+                )
                 else -> LazyColumn(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(results, key = { it.judgment.id }) { ResultCard(it, onClick = { onOpenJudgment(it.judgment.id) }) }
+                    items(results, key = { it.rank }) { // rank is unique per case; judgment ids may repeat in old results
+                         ResultCard(it, onClick = { onOpenJudgment(it.judgment.id) }) }
                 }
             }
         }
@@ -111,7 +125,7 @@ private fun ResultCard(result: CaseResult, onClick: () -> Unit) {
                 Text("${result.relevance}% match", style = MaterialTheme.typography.labelLarge)
             }
             j.summary.text("outcome")?.let { Text("Outcome: $it", style = MaterialTheme.typography.bodyMedium) }
-            Text(result.explanation, style = MaterialTheme.typography.bodyMedium)
+            MarkdownText(result.explanation)
         }
     }
 }

@@ -1,0 +1,28 @@
+"""Hand-labelled chat messages for language identification (English / Hindi / Hinglish)."""
+
+CHAT_LANGUAGE_CASES = [
+    ("I paid an advance of 5 lakh but the seller sold the plot to someone else.", "en"),
+    ("What does clause 5 of my agreement mean?", "en"),
+    ("Can I get my advance back with interest?", "en"),
+    ("Is the receipt enough proof of payment?", "en"),
+    ("The survey number on the receipt is different from the agreement. Is that a problem?", "en"),
+    ("Please explain specific performance in simple words.", "en"),
+    ("Who should I contact for free legal aid in Pune?", "en"),
+    ("What is the par value mentioned in the share certificate?", "en"),
+    ("मैंने 5 लाख अग्रिम दिए थे लेकिन विक्रेता ने प्लॉट किसी और को बेच दिया।", "hi"),
+    ("क्या मुझे ब्याज सहित पैसे वापस मिल सकते हैं?", "hi"),
+    ("रसीद में सर्वे नंबर अलग क्यों है?", "hi"),
+    ("मेरे अनुबंध की धारा 5 का क्या मतलब है?", "hi"),
+    ("कानूनी नोटिस कैसे भेजें?", "hi"),
+    ("मुझे मुफ्त कानूनी सहायता कहाँ मिलेगी?", "hi"),
+    ("maine 5 lakh advance diya tha par seller ne plot kisi aur ko bech diya", "hinglish"),
+    ("kya mujhe mera paisa interest ke saath wapas mil sakta hai?", "hinglish"),
+    ("receipt mein survey number alag kyu hai?", "hinglish"),
+    ("seller ne paisa wapas nahi kiya, ab kya karu?", "hinglish"),
+    ("mere agreement ka clause 5 samjhao please", "hinglish"),
+    ("legal notice bhejna chahiye kya?", "hinglish"),
+    ("bhai ye specific performance kya hota hai, simple mein batao", "hinglish"),
+    ("humne registry nahi karayi thi, sirf agreement hua tha", "hinglish"),
+    ("@receipt.pdf isme kitna amount likha hai?", "hinglish"),
+    ("@agreement.pdf what is the deadline for the balance?", "en"),
+]

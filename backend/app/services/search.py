@@ -99,14 +99,19 @@ def _candidate_block(db: Session, cand: Candidate) -> str:
     j = db.get(Judgment, cand.judgment_id)
     paras = db.scalars(
         select(JudgmentParagraph).where(
-            JudgmentParagraph.judgment_id == j.id, JudgmentParagraph.para_no.in_(cand.para_nos[:4])
+            JudgmentParagraph.judgment_id == j.id, JudgmentParagraph.para_no.in_(cand.para_nos[:2])
         )
     ).all()
-    matched = "\n".join(f"[¶{p.para_no}] {p.text[:1200]}" for p in paras)
+    matched = "\n".join(f"[¶{p.para_no}] {p.text[:700]}" for p in paras)
+    # Only the summary fields the analysis needs, to keep the prompt (and the wait) short. Judgments
+    # ingested without a summary yet (summaries are written on first open) use their headnote instead.
+    summary = {k: j.summary.get(k) for k in ("facts", "issues", "holding", "outcome") if j.summary and j.summary.get(k)}
+    if not summary and j.headnote:
+        summary = {"headnote": j.headnote[:1500]}
     return (
         f'<judgment judgment_id="{j.id}">\n'
         f"Title: {j.title}\nCourt: {j.court}\nDate: {j.decision_date}\nDisposal: {j.disposal}\n"
-        f"Summary: {json.dumps(j.summary, ensure_ascii=False)}\n"
+        f"Summary: {json.dumps(summary, ensure_ascii=False)}\n"
         f"Matching paragraphs:\n{matched}\n</judgment>"
     )
 
@@ -118,6 +123,9 @@ def find_similar_cases(db: Session, case: Case) -> list[CaseResult]:
     queries = [fs["summary"], *fs.get("search_queries", [])]
     candidates = hybrid_search(db, queries, settings.search_candidates)
     if not candidates:
+        # Still a completed search: the app shows "no similar judgments" instead of asking again.
+        case.results = []
+        case.status = "searched"
         return []
 
     blocks = "\n\n".join(_candidate_block(db, c) for c in candidates)
@@ -125,15 +133,21 @@ def find_similar_cases(db: Session, case: Case) -> list[CaseResult]:
         f"<user_case>\n{json.dumps(fs, ensure_ascii=False, indent=1)}\n</user_case>\n\n"
         f"<candidates>\n{blocks}\n</candidates>"
     )
-    analysis = structured(SearchAnalysis, prompts.SEARCH_ANALYSIS_SYSTEM, user_prompt)
+    analysis = structured(SearchAnalysis, prompts.SEARCH_ANALYSIS_SYSTEM, user_prompt, max_tokens=4000)
 
     # Keep only IDs we actually sent (guards against invented citations), best first.
     valid_ids = {c.judgment_id for c in candidates}
-    matches = sorted(
+    ranked = sorted(
         (m for m in analysis.matches if m.judgment_id in valid_ids and m.relevance >= 30),
         key=lambda m: m.relevance,
         reverse=True,
-    )[: settings.search_results]
+    )
+    # One result per judgment: the model sometimes lists the same judgment twice, and the app keys
+    # its lists by judgment id (a duplicate would crash them).
+    best: dict[str, object] = {}
+    for m in ranked:
+        best.setdefault(m.judgment_id, m)
+    matches = list(best.values())[: settings.search_results]
 
     case.results = [
         CaseResult(

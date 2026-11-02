@@ -1,0 +1,19 @@
+set         engine             quality       CER     WER  key values  s/page   conf
+devanagari  tesseract          clean        1.2%    6.1%        100%     0.8     93
+devanagari  tesseract          photo        1.4%    3.8%        100%     0.8     93
+devanagari  tesseract          degraded    44.8%   68.1%         20%     0.5     65
+                                       missed: 45,00,000, 5,00,000, मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-default     clean       85.7%   97.3%         30%    24.7     66
+                                       missed: मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १२३/४, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-default     photo       91.2%  100.0%         30%    22.6     69
+                                       missed: मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १२३/४, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-default     degraded    90.2%  100.0%         30%    22.8     64
+                                       missed: मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १२३/४, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-mobile      clean       93.8%  100.0%          0%     5.4     52
+                                       missed: 123/4, 45,00,000, 5,00,000, मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १२३/४, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-mobile      photo       91.8%  100.0%         30%     5.1     54
+                                       missed: मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १२३/४, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-mobile      degraded    96.3%  100.0%          0%     5.0     58
+                                       missed: 123/4, 45,00,000, 5,00,000, मीरा अय्यर, रवि कुलकर्णी, रवी कुलकर्णी, १२३/४, १५/०३/२०२३, ५,००,०००
+devanagari  paddle-devanagari  clean        2.6%   12.4%         70%    78.5     97
+

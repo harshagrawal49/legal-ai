@@ -44,3 +44,33 @@ def test_openapi_builds():
     paths = app.openapi()["paths"]
     assert "/cases/{case_id}/chat" in paths
     assert "/judgments/{judgment_id}" in paths
+
+
+def test_search_with_no_matches_still_completes(monkeypatch):
+    """Otherwise the app keeps offering "find similar cases" and never shows a result screen."""
+    from app.models import Case
+    from app.services import search
+
+    monkeypatch.setattr(search, "hybrid_search", lambda db, queries, limit: [])
+    case = Case(user_id="u", status="intake", fact_sheet={"summary": "Advance paid; plot sold to another buyer."})
+    assert search.find_similar_cases(None, case) == []
+    assert case.status == "searched" and case.results == []
+
+
+def test_search_keeps_one_result_per_judgment(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.llm.schemas import SearchAnalysis
+    from app.models import Case
+    from app.services import search
+
+    cands = [SimpleNamespace(judgment_id="j1", para_nos=[1], score=1.0), SimpleNamespace(judgment_id="j2", para_nos=[1], score=0.5)]
+    monkeypatch.setattr(search, "hybrid_search", lambda db, q, limit: cands)
+    monkeypatch.setattr(search, "_candidate_block", lambda db, c: c.judgment_id)
+    match = lambda jid, rel: {"judgment_id": jid, "relevance": rel, "stance": "supports", "explanation": "e",  # noqa: E731
+                              "similarities": [], "differences": [], "key_paragraphs": []}
+    monkeypatch.setattr(search, "structured", lambda *a, **k: SearchAnalysis.model_validate(
+        {"matches": [match("j1", 60), match("j1", 90), match("j2", 70)]}))
+    case = Case(user_id="u", fact_sheet={"summary": "s", "search_queries": []})
+    results = search.find_similar_cases(None, case)
+    assert [(r.judgment_id, r.relevance, r.rank) for r in results] == [("j1", 90, 1), ("j2", 70, 2)]

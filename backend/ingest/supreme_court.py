@@ -2,6 +2,10 @@
 
 Dataset: s3://indian-supreme-court-judgments (metadata as parquet per year, English PDFs per judgment).
 
+Older, simpler loader (summarises every judgment at ingestion; no property filter). The main pipeline is
+`python -m ingest` (ingest/pipeline.py), which ingests only property and land disputes from the Supreme
+Court and High Courts, incrementally, without LLM calls.
+
 Usage (from backend/):
     uv run python -m ingest.supreme_court --year 2023 --limit 50
 
@@ -50,7 +54,9 @@ def _get(url: str) -> bytes:
 
 def load_metadata(year: int) -> pd.DataFrame:
     df = pd.read_parquet(io.BytesIO(_get(f"{BUCKET}/metadata/parquet/year={year}/metadata.parquet")))
-    return df[df["available_languages"].fillna("").str.contains("ENG")]
+    # Don't filter on `available_languages`: it is empty for most recent rows (242 of 245 in 2026) even
+    # though the English PDF exists. A missing PDF is detected by its 404 in ingest_row instead.
+    return df
 
 
 def _parse_date(value: str | None) -> date | None:

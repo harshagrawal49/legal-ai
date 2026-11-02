@@ -7,13 +7,22 @@ import kotlinx.serialization.json.JsonObject
 // Mirrors backend/app/schemas.py and backend/app/llm/schemas.py.
 
 @Serializable
-data class Party(val name: String = "", val role: String = "")
+data class Party(val name: String = "", val role: String = "", val sources: List<String> = emptyList())
 
 @Serializable
-data class Event(val date: String? = null, val description: String = "")
+data class Event(val date: String? = null, val description: String = "", val sources: List<String> = emptyList())
 
 @Serializable
-data class Amount(val description: String = "", val value: String = "")
+data class Amount(val description: String = "", val value: String = "", val sources: List<String> = emptyList())
+
+/** Where the user's account and the documents (or two documents) disagree. Both versions are kept. */
+@Serializable
+data class FactConflict(
+    val description: String = "",
+    @SerialName("user_says") val userSays: String? = null,
+    @SerialName("documents_say") val documentsSay: String = "",
+    val sources: List<String> = emptyList(),
+)
 
 @Serializable
 data class FactSheet(
@@ -29,6 +38,7 @@ data class FactSheet(
     @SerialName("legal_areas") val legalAreas: List<String> = emptyList(),
     @SerialName("search_queries") val searchQueries: List<String> = emptyList(),
     @SerialName("missing_info") val missingInfo: List<String> = emptyList(),
+    val conflicts: List<FactConflict> = emptyList(),
 )
 
 @Serializable
@@ -100,6 +110,20 @@ data class ChatMessage(
     val id: Int,
     val role: String,
     @SerialName("display_text") val displayText: String,
+    val sources: List<ChatSource> = emptyList(),
+    val mentions: List<String> = emptyList(),
+)
+
+/** A verified source of an assistant reply: a document page or a judgment. */
+@Serializable
+data class ChatSource(
+    val type: String, // document | judgment
+    @SerialName("document_id") val documentId: String? = null,
+    val filename: String? = null,
+    val page: Int? = null,
+    @SerialName("judgment_id") val judgmentId: String? = null,
+    val title: String? = null,
+    val court: String? = null,
 )
 
 // Request bodies
@@ -110,4 +134,168 @@ data class NewCaseRequest(val description: String)
 data class IntakeAnswerRequest(val text: String)
 
 @Serializable
-data class ChatRequest(val message: String)
+data class ChatRequest(val message: String, val mentions: List<String> = emptyList())
+
+// ---------- Uploaded documents, evidence pack and brief ----------
+
+@Serializable
+data class DocumentSummary(
+    val id: String,
+    val filename: String,
+    val status: String, // processed | text_only | failed
+    val error: String? = null,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+    @SerialName("ocr_pages") val ocrPages: Int = 0,
+    val understood: Boolean = false,
+    val language: String? = null, // en | hi
+)
+
+@Serializable
+data class DocumentDetail(
+    val id: String,
+    val filename: String,
+    val status: String,
+    val error: String? = null,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+    @SerialName("ocr_pages") val ocrPages: Int = 0,
+    val pages: List<String> = emptyList(),
+    /** Per page: {"source": "text" | "ocr" | "ocr_unreadable" | ..., "engine", "confidence"}. */
+    @SerialName("page_info") val pageInfo: List<JsonObject> = emptyList(),
+    val facts: JsonObject = JsonObject(emptyMap()), // backend/app/llm/schemas.py: DocumentFacts
+)
+
+@Serializable
+data class SourceRef(
+    @SerialName("document_id") val documentId: String,
+    val filename: String,
+    val page: Int? = null,
+    val excerpt: String? = null,
+    val verified: Boolean = false,
+    @SerialName("from_ocr") val fromOcr: Boolean = false,
+    val value: String? = null,
+)
+
+@Serializable
+data class TimelineItem(
+    val date: String? = null,
+    @SerialName("date_as_written") val dateAsWritten: String? = null,
+    val kind: String,
+    val description: String,
+    val source: SourceRef,
+)
+
+@Serializable
+data class Flag(val kind: String, val message: String, val sources: List<SourceRef> = emptyList())
+
+@Serializable
+data class Evidence(val timeline: List<TimelineItem> = emptyList(), val flags: List<Flag> = emptyList())
+
+@Serializable
+data class SupportedFact(val category: String, val text: String, val source: SourceRef)
+
+@Serializable
+data class LegalSource(
+    @SerialName("judgment_id") val judgmentId: String,
+    val title: String,
+    val court: String,
+    @SerialName("decision_date") val decisionDate: String? = null,
+    val citation: String? = null,
+    @SerialName("why_it_may_matter") val whyItMayMatter: String,
+    @SerialName("key_paragraphs") val keyParagraphs: List<Int> = emptyList(),
+)
+
+@Serializable
+data class Brief(
+    val disclaimer: String,
+    @SerialName("user_summary") val userSummary: String? = null,
+    val documents: List<BriefDocument> = emptyList(),
+    val chronology: List<TimelineItem> = emptyList(),
+    @SerialName("document_supported_facts") val supportedFacts: List<SupportedFact> = emptyList(),
+    @SerialName("user_account_not_verified") val userAccount: List<String> = emptyList(),
+    @SerialName("gaps_and_inconsistencies") val gaps: List<Flag> = emptyList(),
+    @SerialName("legal_sources") val legalSources: List<LegalSource> = emptyList(),
+    @SerialName("advocate_questions") val advocateQuestions: List<String> = emptyList(),
+    val checklist: List<String> = emptyList(),
+    @SerialName("suggestions_ai_generated") val suggestionsAiGenerated: Boolean = false,
+)
+
+@Serializable
+data class BriefDocument(
+    @SerialName("document_id") val documentId: String,
+    val filename: String,
+    val status: String,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+    val error: String? = null,
+    @SerialName("ocr_pages") val ocrPages: Int = 0,
+    @SerialName("ocr_confidence") val ocrConfidence: Double? = null,
+)
+
+// ---------- Document understanding (backend/app/services/understanding.py) ----------
+
+@Serializable
+data class ExplainedPoint(
+    val text: String = "",
+    val pages: List<Int> = emptyList(),
+    val quote: String? = null,
+    val verified: Boolean = false,
+    @SerialName("from_ocr") val fromOcr: Boolean = false,
+    val kind: String? = null, // set for rule-based checks
+)
+
+@Serializable
+data class ClauseExplained(
+    val label: String = "",
+    val meaning: String = "",
+    val pages: List<Int> = emptyList(),
+    val quote: String? = null,
+    val verified: Boolean = false,
+)
+
+@Serializable
+data class TermExplained(
+    val id: String,
+    val term: String,
+    val hindi: String? = null,
+    val meaning: String = "",
+    @SerialName("why_it_matters") val whyItMatters: String = "",
+    val law: String? = null,
+    val page: Int? = null,
+    val excerpt: String? = null,
+    @SerialName("in_this_document") val inThisDocument: String? = null,
+)
+
+@Serializable
+data class TypeCheck(
+    @SerialName("rule_based") val ruleBased: String = "other",
+    val confidence: Double = 0.0,
+    val agrees: Boolean = true,
+)
+
+@Serializable
+data class Understanding(
+    val language: String = "en",
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("type_check") val typeCheck: TypeCheck = TypeCheck(),
+    @SerialName("one_line") val oneLine: String = "",
+    val summary: List<ExplainedPoint> = emptyList(),
+    val clauses: List<ClauseExplained> = emptyList(),
+    val terms: List<TermExplained> = emptyList(),
+    @SerialName("things_to_check") val thingsToCheck: List<ExplainedPoint> = emptyList(),
+    val status: String = "partial", // complete | partial (AI explanation unavailable)
+)
+
+/** A document in "All my documents" (across cases). */
+@Serializable
+data class LibraryDocument(
+    val id: String,
+    @SerialName("case_id") val caseId: String,
+    @SerialName("case_title") val caseTitle: String,
+    val filename: String,
+    val status: String,
+    @SerialName("document_type") val documentType: String? = null,
+    @SerialName("page_count") val pageCount: Int = 0,
+    val understood: Boolean = false,
+)

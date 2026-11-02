@@ -1,9 +1,11 @@
+import uuid
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import DB, User, UserCase
-from app.models import Case
+from app.models import Case, Judgment
 from app.schemas import (
     CaseOut,
     CaseResultOut,
@@ -29,8 +31,16 @@ def _case_out(case: Case) -> CaseOut:
 
 @router.post("", response_model=CaseOut)
 def create_case(body: NewCaseIn, db: DB, user: User):
-    """Step 1: the user describes their problem. Returns the first fact sheet and any follow-up questions."""
-    case = Case(user_id=user, intake_inputs=[{"role": "user", "text": body.description}])
+    """Step 1: the user describes their problem, or leaves it empty to start from documents. Returns
+    the first fact sheet and any follow-up questions (empty until a document is processed)."""
+    text = body.description.strip()
+    if 0 < len(text) < 20:
+        raise HTTPException(422, "Please describe the situation in a few more words, or leave it empty and upload documents.")
+    case = Case(
+        id=uuid.uuid4(), user_id=user, title="New case" if text else "New case (from documents)",
+        intake_inputs=[{"role": "user", "text": text}] if text else [],
+    )
+    case.documents = []
     intake.run_intake(case)
     db.add(case)
     db.commit()
@@ -69,6 +79,12 @@ def run_search(case: UserCase, db: DB):
     """Step 3: the user confirms the summary; find and explain similar judgments."""
     if not case.fact_sheet:
         raise HTTPException(400, "Describe the case first")
+    if not db.scalar(select(func.count()).select_from(Judgment)):
+        raise HTTPException(
+            409,
+            "No court judgments have been loaded on the server yet, so there is nothing to search. "
+            "Load some with: uv run python -m ingest.supreme_court --year 2023 --limit 30",
+        )
     results = search.find_similar_cases(db, case)
     db.commit()
     return results
@@ -87,6 +103,13 @@ def chat_history(case: UserCase):
 
 @router.post("/{case_id}/chat")
 def chat(body: ChatIn, case: UserCase):
-    """Step 4: follow-up conversation. Streams server-sent events: text, tool, done, error."""
-    return StreamingResponse(advisor.stream_reply(case.id, body.message), media_type="text/event-stream")
+    """Step 4: follow-up conversation. Streams server-sent events: text, tool, done (with `sources`), error.
+    `mentions`: document ids the user referenced with @; they must belong to this case."""
+    own = {d.id for d in case.documents}
+    unknown = [m for m in body.mentions if m not in own]
+    if unknown:
+        raise HTTPException(422, "A referenced document doesn't belong to this case.")
+    return StreamingResponse(
+        advisor.stream_reply(case.id, body.message, [str(m) for m in body.mentions]), media_type="text/event-stream"
+    )
 
